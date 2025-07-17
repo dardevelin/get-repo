@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +27,8 @@ const (
 	stateCloning
 	stateUpdate
 	stateRemoveConfirm
+	stateUpdateSelection // New state for multi-selection update
+	stateRemoveSelection // New state for multi-selection remove
 )
 
 var (
@@ -37,6 +39,8 @@ var (
 			Padding(0, 1)
 
 	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	selectedItemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("170"))
+	
 )
 
 type model struct {
@@ -47,15 +51,17 @@ type model struct {
 	spinner   spinner.Model
 	statusMsg string
 	err       error
+	selected  map[int]struct{} // For multi-selection
 }
 
-func initialModel() model {
+func initialModel(initialAppState state) model {
 	cfg, err := config.Load()
 	if err != nil {
 		return model{err: err}
 	}
 
 	if cfg.CodebasesPath == "" {
+		// If the path is not set, we must start in setup mode.
 		ti := textinput.New()
 		ti.Placeholder = "$HOME/dev/vcs-codebases"
 		ti.Focus()
@@ -69,6 +75,7 @@ func initialModel() model {
 		}
 	}
 
+	// Config is ready, scan for repos
 	repos, err := scanForRepos(cfg.CodebasesPath)
 	if err != nil {
 		return model{err: err}
@@ -79,19 +86,28 @@ func initialModel() model {
 		items[i] = item(repo)
 	}
 
-	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
+	l := list.New(items, list.NewDefaultDelegate(), 1, 1)
 	l.Title = "Your Repositories"
-	l.SetShowHelp(false)
+	l.SetShowHelp(false) // We'll render our own help
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	// Set list options based on initialAppState
+	switch initialAppState {
+	case stateUpdateSelection:
+		l.Title = "Select repositories to update (Space to toggle, Enter to confirm)"
+	case stateRemoveSelection:
+		l.Title = "Select repositories to remove (Space to toggle, Enter to confirm)"
+	}
+
 	return model{
-		state:   stateList,
+		state:   initialAppState,
 		config:  cfg,
 		list:    l,
 		spinner: s,
+		selected: make(map[int]struct{}),
 	}
 }
 
@@ -107,9 +123,8 @@ type updateFinishedMsg struct{ err error }
 type removeFinishedMsg struct{ err error }
 
 // --- Commands ---
-func (m model) cloneRepo() tea.Cmd {
+func (m model) cloneRepo(url string) tea.Cmd {
 	return func() tea.Msg {
-		url := m.textInput.Value()
 		clonePath := getClonePath(url)
 		dest := filepath.Join(m.config.CodebasesPath, clonePath)
 
@@ -118,6 +133,8 @@ func (m model) cloneRepo() tea.Cmd {
 		}
 
 		cmd := exec.Command("git", "clone", url, dest)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			return cloneFinishedMsg{err: fmt.Errorf("git clone failed: %w", err)}
 		}
@@ -125,12 +142,13 @@ func (m model) cloneRepo() tea.Cmd {
 	}
 }
 
-func (m model) updateRepo() tea.Cmd {
+func (m model) updateRepo(repoName string) tea.Cmd {
 	return func() tea.Msg {
-		selectedItem := m.list.SelectedItem().(item)
-		repoPath := filepath.Join(m.config.CodebasesPath, string(selectedItem))
+		repoPath := filepath.Join(m.config.CodebasesPath, repoName)
 
 		cmd := exec.Command("git", "-C", repoPath, "pull")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			return updateFinishedMsg{err: fmt.Errorf("git pull failed: %w", err)}
 		}
@@ -138,10 +156,9 @@ func (m model) updateRepo() tea.Cmd {
 	}
 }
 
-func (m model) removeRepo() tea.Cmd {
+func (m model) removeRepo(repoName string) tea.Cmd {
 	return func() tea.Msg {
-		selectedItem := m.list.SelectedItem().(item)
-		repoPath := filepath.Join(m.config.CodebasesPath, string(selectedItem))
+		repoPath := filepath.Join(m.config.CodebasesPath, repoName)
 
 		if err := os.RemoveAll(repoPath); err != nil {
 			return removeFinishedMsg{err: fmt.Errorf("failed to remove directory: %w", err)}
@@ -180,22 +197,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.Focus()
 				m.textInput.Width = 50
 			case "u":
-				if m.list.SelectedItem() != nil {
-					m.state = stateUpdate
-					m.statusMsg = fmt.Sprintf("Updating %s...", m.list.SelectedItem().(item).Title())
-					return m, m.updateRepo()
+				// If no item selected, go to multi-select update
+				if m.list.SelectedItem() == nil {
+					return initialModel(stateUpdateSelection), nil
 				}
+				// Otherwise, update single selected item
+				m.state = stateUpdate
+				m.statusMsg = fmt.Sprintf("Updating %s...", m.list.SelectedItem().(item).Title())
+				return m, m.updateRepo(m.list.SelectedItem().(item).Title())
 			case "r":
-				if m.list.SelectedItem() != nil {
-					m.state = stateRemoveConfirm
+				// If no item selected, go to multi-select remove
+				if m.list.SelectedItem() == nil {
+					return initialModel(stateRemoveSelection), nil
 				}
+				// Otherwise, confirm single selected item removal
+				m.state = stateRemoveConfirm
 			}
 		case stateClone:
 			switch msg.String() {
 			case "enter":
 				m.state = stateCloning
 				m.statusMsg = fmt.Sprintf("Cloning %s...", m.textInput.Value())
-				return m, m.cloneRepo()
+				return m, m.cloneRepo(m.textInput.Value())
 			case "esc":
 				m.state = stateList
 			}
@@ -204,7 +227,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "y", "Y":
 				m.state = stateUpdate // Use same spinner as update
 				m.statusMsg = fmt.Sprintf("Removing %s...", m.list.SelectedItem().(item).Title())
-				return m, m.removeRepo()
+				return m, m.removeRepo(m.list.SelectedItem().(item).Title())
 			default: // Any other key cancels
 				m.state = stateList
 			}
@@ -225,7 +248,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.err = fmt.Errorf("could not save config: %w", err)
 					return m, nil
 				}
-				return initialModel(), nil
+				return initialModel(stateList), nil // Re-run initialModel to load repos
+			}
+		case stateUpdateSelection, stateRemoveSelection:
+			switch msg.String() {
+			case " ": // Space key to toggle selection
+					index := m.list.Cursor()
+					if _, ok := m.selected[index]; ok {
+						delete(m.selected, index)
+					} else {
+						m.selected[index] = struct{}{}
+					}
+			case "enter":
+				// Process selected items
+				var selectedRepoNames []string
+				for idx := range m.selected {
+					selectedRepoNames = append(selectedRepoNames, m.list.Items()[idx].(item).Title())
+				}
+
+				if len(selectedRepoNames) == 0 {
+					m.state = stateList // Go back if nothing selected
+					return m, nil
+				}
+
+				// Dispatch commands for each selected repo
+				cmds := make([]tea.Cmd, len(selectedRepoNames))
+				for i, repoName := range selectedRepoNames {
+					if m.state == stateUpdateSelection {
+						cmds[i] = m.updateRepo(repoName)
+					} else if m.state == stateRemoveSelection {
+						cmds[i] = m.removeRepo(repoName)
+					}
+				}
+				m.state = stateUpdate // Use update state for batch operations
+				m.statusMsg = fmt.Sprintf("Processing %d repositories...", len(selectedRepoNames))
+				return m, tea.Batch(cmds...)
+			case "esc":
+				m.state = stateList
+				return m, nil
 			}
 		}
 
@@ -245,7 +305,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		// Refresh the model
-		refreshedModel := initialModel()
+		refreshedModel := initialModel(stateList)
 		refreshedModel.err = m.err // Persist error if there was one
 		return refreshedModel, nil
 
@@ -257,9 +317,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.state {
 	case stateSetup, stateClone:
 		m.textInput, cmd = m.textInput.Update(msg)
-	case stateUpdate, stateCloning:
+	case stateCloning, stateUpdate:
 		m.spinner, cmd = m.spinner.Update(msg)
-	default:
+	case stateList, stateUpdateSelection, stateRemoveSelection:
 		m.list, cmd = m.list.Update(msg)
 	}
 
@@ -271,25 +331,54 @@ func (m model) View() string {
 		return fmt.Sprintf("\nError: %v\n\nPress any key to return to the list.", m.err)
 	}
 
+	var s string
 	switch m.state {
 	case stateSetup:
-		return fmt.Sprintf("\n%s\n\nPlease enter the path for your codebases directory.\n\n%s\n\n%s", titleStyle.Render("Welcome"), m.textInput.View(), helpStyle.Render("Enter to save"))
+		s = fmt.Sprintf("\n%s\n\nPlease enter the path for your codebases directory.\n\n%s\n\n%s", titleStyle.Render("Welcome"), m.textInput.View(), helpStyle.Render("Enter to save"))
 	case stateClone:
-		return fmt.Sprintf("\n%s\n\nEnter the repository URL to clone.\n\n%s\n\n%s", titleStyle.Render("Clone"), m.textInput.View(), helpStyle.Render("Enter: clone, Esc: cancel"))
+		s = fmt.Sprintf("\n%s\n\nEnter the repository URL to clone.\n\n%s\n\n%s", titleStyle.Render("Clone"), m.textInput.View(), helpStyle.Render("Enter: clone, Esc: cancel"))
 	case stateCloning, stateUpdate:
-		return fmt.Sprintf("\n\n   %s %s\n\n", m.spinner.View(), m.statusMsg)
+		s = fmt.Sprintf("\n\n   %s %s\n\n", m.spinner.View(), m.statusMsg)
 	case stateRemoveConfirm:
 		selected := m.list.SelectedItem().(item).Title()
-		return fmt.Sprintf("\n\n   Are you sure you want to remove %s?\n   This action cannot be undone.\n\n   [y/N]\n\n", titleStyle.Render(selected))
-	case stateList:
-		return lipgloss.NewStyle().Margin(1, 2).Render(m.list.View()) + "\n" + m.helpView()
+		s = fmt.Sprintf("\n\n   Are you sure you want to remove %s?\n   This action cannot be undone.\n\n   [y/N]\n\n", titleStyle.Render(selected))
+	case stateList, stateUpdateSelection, stateRemoveSelection:
+		var listContent string
+		if m.state == stateUpdateSelection || m.state == stateRemoveSelection {
+			// Manually render list items with checkboxes
+			items := m.list.Items()
+			for i, listItem := range items {
+				checked := " " // not selected
+				if _, ok := m.selected[i]; ok {
+					checked = "x" // selected
+				}
+				
+				line := fmt.Sprintf("[%s] %s", checked, listItem.(item).Title())
+				if i == m.list.Cursor() {
+					line = selectedItemStyle.Render(line)
+				}
+				listContent += line + "\n"
+			}
+			s = lipgloss.NewStyle().Margin(1, 2).Render(m.list.Title + "\n" + listContent)
+		} else {
+			s = lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+		}
+		s += "\n" + m.helpView()
 	default:
-		return "Unknown state."
+		s = "Unknown state."
 	}
+	return s
 }
 
 func (m model) helpView() string {
-	return helpStyle.Render("  ↑/↓: navigate | c: clone | u: update | r: remove | q: quit")
+	switch m.state {
+	case stateUpdateSelection:
+		return helpStyle.Render("  Space: toggle selection | Enter: confirm | Esc: cancel")
+	case stateRemoveSelection:
+		return helpStyle.Render("  Space: toggle selection | Enter: confirm | Esc: cancel")
+	default:
+		return helpStyle.Render("  ↑/↓: navigate | c: clone | u: update | r: remove | q: quit")
+	}
 }
 
 // --- Helper Functions ---
@@ -301,7 +390,7 @@ func scanForRepos(root string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() && d.Name() == ".git" {
-			relPath, _ := filepath.rel(root, filepath.Dir(path))
+			relPath, _ := filepath.Rel(root, filepath.Dir(path))
 			repos = append(repos, relPath)
 			return filepath.SkipDir
 		}
@@ -321,7 +410,78 @@ func getClonePath(url string) string {
 	return path
 }
 
-func main() {
+// --- Non-interactive command handlers ---
+
+func handleListCommand(cfg config.Config) {
+	repos, err := scanForRepos(cfg.CodebasesPath)
+	if err != nil {
+		fmt.Printf("Error scanning for repos: %v\n", err)
+		os.Exit(1)
+	}
+	for _, repo := range repos {
+		fmt.Println(repo)
+	}
+}
+
+func handleCloneCommand(cfg config.Config, url string) {
+	clonePath := getClonePath(url)
+	dest := filepath.Join(cfg.CodebasesPath, clonePath)
+
+	fmt.Printf("Cloning %s into %s...\n", url, dest)
+
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		fmt.Printf("Error creating directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	cmd := exec.Command("git", "clone", url, dest)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Error cloning repo: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Clone complete.")
+}
+
+func handleUpdateCommand(cfg config.Config, repoName string) {
+	repoPath := filepath.Join(cfg.CodebasesPath, repoName)
+	fmt.Printf("Updating %s...\n", repoName)
+	cmd := exec.Command("git", "-C", repoPath, "pull")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Error updating repo: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Update complete.")
+}
+
+func handleRemoveCommand(cfg config.Config, args []string) {
+	repoName := args[0]
+	repoPath := filepath.Join(cfg.CodebasesPath, repoName)
+
+	force := len(args) > 1 && args[1] == "--force"
+
+	if !force {
+		fmt.Printf("Are you sure you want to remove %s? [y/N] ", repoName)
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		if strings.TrimSpace(strings.ToLower(input)) != "y" {
+			fmt.Println("Remove cancelled.")
+			os.Exit(0)
+		}
+	}
+
+	fmt.Printf("Removing %s...\n", repoName)
+	if err := os.RemoveAll(repoPath); err != nil {
+		fmt.Printf("Error removing repo: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Repository removed.")
+}
+
+func launchTUI(initialAppState state) {
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
 		fmt.Println("fatal:", err)
@@ -329,10 +489,67 @@ func main() {
 	}
 	defer f.Close()
 
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(initialAppState), tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
+}
+
+func main() {
+	// Check for interactive flags first
+	if len(os.Args) > 1 && (os.Args[1] == "-i" || os.Args[1] == "--interactive") {
+		launchTUI(stateList) // Launch TUI in default list mode
+		return
+	}
+
+	// Handle non-interactive commands or specific TUI modes
+	if len(os.Args) > 1 {
+		cmd := os.Args[1]
+		args := os.Args[2:] // Remaining arguments
+
+		// Commands that don't require config to be set (e.g., help, version, or setup)
+		// For now, all commands require config, so load it here.
+		cfg, err := config.Load()
+		if err != nil {
+			fmt.Printf("Error loading config: %v\n", err)
+			os.Exit(1)
+		}
+		if cfg.CodebasesPath == "" && cmd != "list" && cmd != "update" && cmd != "remove" {
+			// If config is not set, and it's not a command that can launch TUI for setup,
+			// then we can't proceed with non-interactive commands.
+			fmt.Println("Error: VCS_CODEBASES path not set. Please run 'get-repo' interactively to configure.")
+			os.Exit(1)
+		}
+
+		switch cmd {
+		case "list":
+			handleListCommand(cfg)
+		case "update":
+			if len(args) == 0 { // get-repo update (no args) -> interactive update
+				launchTUI(stateUpdateSelection)
+			} else { // get-repo update <repo-name> -> non-interactive update
+				handleUpdateCommand(cfg, args[0])
+			}
+		case "remove":
+			if len(args) == 0 { // get-repo remove (no args) -> interactive remove
+				launchTUI(stateRemoveSelection)
+			} else { // get-repo remove <repo-name> [--force] -> non-interactive remove
+				handleRemoveCommand(cfg, args)
+			}
+		default: // Assume it's a URL for cloning
+			if strings.HasPrefix(cmd, "http") || strings.HasPrefix(cmd, "git@") {
+				handleCloneCommand(cfg, cmd) // cmd is the URL
+			} else {
+				fmt.Printf("Unknown command or invalid URL: %s\n", cmd)
+				fmt.Println("Usage: get-repo [url] | [list|update|remove] | [-i|--interactive]")
+				os.Exit(1)
+			}
+		}
+		return // Exit after handling non-interactive command or launching specific TUI
+	}
+
+	// Default to interactive mode if no arguments
+	launchTUI(stateList)
 }
