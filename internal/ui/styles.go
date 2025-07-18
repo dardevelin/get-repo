@@ -24,6 +24,9 @@ var (
 	SuccessStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("10"))
 		
+	PendingStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("11"))
+		
 	// Box styles
 	DialogBoxStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

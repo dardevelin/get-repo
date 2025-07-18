@@ -190,7 +190,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.state = StateBatchOperation
 				m.totalOps = len(selectedRepos)
 				m.completedOps = 0
-				m.operationResults = nil
+				m.operationResults = nil // Clear previous results
 				
 				// Set pending status for all selected repositories
 				for _, repoPath := range selectedRepos {
@@ -221,7 +221,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Initialize batch operation tracking for single operation
 		m.totalOps = 1
 		m.completedOps = 0
-		m.operationResults = nil
+		m.operationResults = nil // Clear previous results
 		
 		m.state = StateUpdate
 		m.statusMsg = fmt.Sprintf("Updating %s...", selectedItem.name)
@@ -595,7 +595,28 @@ func (m Model) renderRemoveConfirm() string {
 func (m Model) renderList() string {
 	content := lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 	help := m.getListHelp()
-	return content + "\n" + help
+	
+	// Show any recent operation results at the bottom
+	var resultSection string
+	if len(m.operationResults) > 0 && m.state == StateList {
+		var recentErrors []string
+		for _, result := range m.operationResults {
+			if !result.Success {
+				errorMsg := result.Message
+				if len(errorMsg) > 60 {
+					errorMsg = errorMsg[:57] + "..."
+				}
+				recentErrors = append(recentErrors, fmt.Sprintf("  ✗ %s: %s", result.RepoName, errorMsg))
+			}
+		}
+		
+		if len(recentErrors) > 0 {
+			resultSection = "\n\n" + ErrorStyle.Render("Recent Errors:") + "\n" + 
+				ErrorStyle.Render(strings.Join(recentErrors, "\n"))
+		}
+	}
+	
+	return content + "\n" + help + resultSection
 }
 
 func (m Model) renderSelection() string {
@@ -642,28 +663,73 @@ func (m Model) renderSelection() string {
 }
 
 func (m Model) renderBatchOperation() string {
-	progressBar := m.progress.View()
-	status := fmt.Sprintf("Processing %d/%d repositories...", m.completedOps, m.totalOps)
+	// Header section
+	header := TitleStyle.Render("Batch Operation")
 	
-	var details []string
+	// Progress section
+	progressBar := m.progress.View()
+	status := fmt.Sprintf("%s Processing %d/%d repositories...", m.spinner.View(), m.completedOps, m.totalOps)
+	
+	// Split results into succeeded and failed for better organization
+	var succeeded []string
+	var failed []string
+	var pending []string
+	
+	// Track which repos have been processed
+	processedRepos := make(map[string]bool)
 	for _, result := range m.operationResults {
+		processedRepos[result.RepoName] = true
 		if result.Success {
-			details = append(details, SuccessStyle.Render(fmt.Sprintf("✓ %s", result.RepoName)))
+			succeeded = append(succeeded, fmt.Sprintf("  ✓ %s", result.RepoName))
 		} else {
-			details = append(details, ErrorStyle.Render(fmt.Sprintf("✗ %s: %s", result.RepoName, result.Message)))
+			// Format error message more clearly
+			errorMsg := result.Message
+			if len(errorMsg) > 50 {
+				errorMsg = errorMsg[:47] + "..."
+			}
+			failed = append(failed, fmt.Sprintf("  ✗ %s", result.RepoName))
+			failed = append(failed, fmt.Sprintf("    └─ %s", errorMsg))
 		}
 	}
 	
-	content := fmt.Sprintf(
-		"\n%s\n\n%s\n\n%s %s\n\n%s",
-		TitleStyle.Render("Batch Operation"),
-		progressBar,
-		m.spinner.View(),
-		status,
-		strings.Join(details, "\n"),
-	)
+	// Show pending operations
+	items := m.list.Items()
+	for _, item := range items {
+		if i := item.(Item); i.node != nil && i.node.Status == StatusPending {
+			if !processedRepos[i.node.Path] {
+				pending = append(pending, fmt.Sprintf("  ⏳ %s", i.node.Name))
+			}
+		}
+	}
 	
-	return content
+	// Build content sections
+	var sections []string
+	sections = append(sections, header)
+	sections = append(sections, "")
+	sections = append(sections, progressBar)
+	sections = append(sections, "")
+	sections = append(sections, status)
+	sections = append(sections, "")
+	
+	// Add sections based on what we have
+	if len(pending) > 0 {
+		sections = append(sections, PendingStyle.Render("Pending:"))
+		sections = append(sections, strings.Join(pending, "\n"))
+		sections = append(sections, "")
+	}
+	
+	if len(succeeded) > 0 {
+		sections = append(sections, SuccessStyle.Render("Succeeded:"))
+		sections = append(sections, SuccessStyle.Render(strings.Join(succeeded, "\n")))
+		sections = append(sections, "")
+	}
+	
+	if len(failed) > 0 {
+		sections = append(sections, ErrorStyle.Render("Failed:"))
+		sections = append(sections, ErrorStyle.Render(strings.Join(failed, "\n")))
+	}
+	
+	return "\n" + strings.Join(sections, "\n")
 }
 
 func (m Model) getListHelp() string {
