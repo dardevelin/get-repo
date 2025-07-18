@@ -17,6 +17,9 @@ get-repo
 *.log
 debug.log
 
+# Signing configuration (contains secrets)
+scripts/sign-config.sh
+
 # IDE files
 .vscode/
 .idea/
