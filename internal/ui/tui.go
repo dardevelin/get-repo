@@ -115,7 +115,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
 			m.list.Title = currentTitle // Preserve title
-			m.list.SetShowTitle(true) // Force show title
+			// Title is rendered separately in renderList
 		}
 		m.operationMutex.Unlock()
 		
@@ -166,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.list.Title == "" {
 			m.list.Title = "Your Repositories"
 		}
-		m.list.SetShowTitle(true) // Force title to be shown
+		// Title is rendered separately in renderList
 		// Update spinner if operations are running
 		if m.totalOps > 0 && m.completedOps < m.totalOps {
 			m.spinner, cmd = m.spinner.Update(msg)
@@ -198,47 +198,46 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.textInput.Width = 50
 		return m, textinput.Blink
 	case "u":
+		// First check if we have pre-selected items from the main list
+		items := m.list.Items()
+		hasSelections := false
+		selectedRepos := []string{}
+		
+		for _, listItem := range items {
+			item := listItem.(Item)
+			if item.selected && item.isGitRepo {
+				hasSelections = true
+				selectedRepos = append(selectedRepos, item.node.Path)
+			}
+		}
+		
+		// If we have pre-selected items, process them immediately
+		if hasSelections {
+			// Stay in list state but track operations
+			m.totalOps = len(selectedRepos)
+			m.completedOps = 0
+			m.operationResults = nil // Clear previous results
+			m.list.Title = "Your Repositories" // Ensure title is set
+			
+			// Set pending status for all selected repositories
+			for _, repoPath := range selectedRepos {
+				m.setNodePending(repoPath)
+			}
+			
+			// Create commands for each repo
+			var cmds []tea.Cmd
+			for _, repoPath := range selectedRepos {
+				cmds = append(cmds, m.updateRepo(repoPath))
+			}
+			
+			cmds = append(cmds, m.spinner.Tick)
+			return m, tea.Batch(cmds...)
+		}
+		
+		// If no selections and no item under cursor, go to selection mode
 		if m.list.SelectedItem() == nil {
-			// Go to multi-select mode - preserve current model state
 			m.state = StateUpdateSelection
 			m.list.Title = "Select repositories to update (Space to toggle, Enter to confirm)"
-			
-			// Check if we have pre-selected items from the main list
-			items := m.list.Items()
-			hasSelections := false
-			selectedRepos := []string{}
-			
-			for _, listItem := range items {
-				item := listItem.(Item)
-				if item.selected && item.isGitRepo {
-					hasSelections = true
-					selectedRepos = append(selectedRepos, item.node.Path)
-				}
-			}
-			
-			// If we have pre-selected items, process them immediately
-			if hasSelections {
-				// Stay in list state but track operations
-				m.totalOps = len(selectedRepos)
-				m.completedOps = 0
-				m.operationResults = nil // Clear previous results
-				m.list.Title = "Your Repositories" // Ensure title is set
-				
-				// Set pending status for all selected repositories
-				for _, repoPath := range selectedRepos {
-					m.setNodePending(repoPath)
-				}
-				
-				// Create commands for each repo
-				var cmds []tea.Cmd
-				for _, repoPath := range selectedRepos {
-					cmds = append(cmds, m.updateRepo(repoPath))
-				}
-				
-				cmds = append(cmds, m.spinner.Tick)
-				return m, tea.Batch(cmds...)
-			}
-			
 			return m, nil
 		}
 		// Update single item
@@ -262,33 +261,33 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateRepo(repoPath),
 		)
 	case "r":
-		if m.list.SelectedItem() == nil {
-			// Go to multi-select mode - preserve current model state
-			m.state = StateRemoveSelection
-			m.list.Title = "Select repositories to remove (Space to toggle, Enter to confirm)"
-			
-			// Check if we have pre-selected items from the main list
-			items := m.list.Items()
-			hasSelections := false
-			selectedRepos := []string{}
-			
-			for _, listItem := range items {
-				item := listItem.(Item)
-				if item.selected && item.isGitRepo {
-					hasSelections = true
-					selectedRepos = append(selectedRepos, item.node.Path)
-				}
+		// First check if we have pre-selected items from the main list
+		items := m.list.Items()
+		hasSelections := false
+		selectedRepos := []string{}
+		
+		for _, listItem := range items {
+			item := listItem.(Item)
+			if item.selected && item.isGitRepo {
+				hasSelections = true
+				selectedRepos = append(selectedRepos, item.node.Path)
 			}
-			
-			// If we have pre-selected items, confirm removal
-			if hasSelections {
-				m.state = StateRemoveConfirm
-				m.batchRemoveRepos = selectedRepos
-				return m, nil
-			}
-			
+		}
+		
+		// If we have pre-selected items, confirm removal
+		if hasSelections {
+			m.state = StateRemoveConfirm
+			m.batchRemoveRepos = selectedRepos
 			return m, nil
 		}
+		
+		// If no selections and no item under cursor, go to selection mode
+		if m.list.SelectedItem() == nil {
+			m.state = StateRemoveSelection
+			m.list.Title = "Select repositories to remove (Space to toggle, Enter to confirm)"
+			return m, nil
+		}
+		
 		// Confirm single removal
 		m.state = StateRemoveConfirm
 		return m, nil
@@ -321,8 +320,8 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
 			m.list.Title = currentTitle // Preserve title
-			m.list.SetShowTitle(true) // Force show title
-			m.list.SetShowTitle(true) // Force show title
+			// Title is rendered separately in renderList
+			// Title is rendered separately in renderList
 			debug.Log("After SetItems - Title: '%s', ShowTitle: %v", m.list.Title, m.list.ShowTitle())
 			
 			// Update status message with current selection count
@@ -634,7 +633,20 @@ func (m Model) renderRemoveConfirm() string {
 }
 
 func (m Model) renderList() string {
-	content := lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+	// Render title separately to ensure it's always shown
+	title := TitleStyle.Render("Your Repositories")
+	
+	// Get the list view without margins first
+	listView := m.list.View()
+	
+	// Apply margins to the list content
+	content := lipgloss.NewStyle().Margin(0, 2).Render(listView)
+	
+	// Combine title and content
+	fullContent := lipgloss.JoinVertical(lipgloss.Left, 
+		lipgloss.NewStyle().Margin(1, 2, 0, 2).Render(title),
+		content)
+	
 	help := m.getListHelp()
 	
 	var bottomSection string
@@ -667,7 +679,7 @@ func (m Model) renderList() string {
 		}
 	}
 	
-	return content + "\n" + help + bottomSection
+	return fullContent + "\n" + help + bottomSection
 }
 
 func (m Model) renderSelection() string {
@@ -958,7 +970,7 @@ func (m *Model) refreshTreeDisplay() {
 	title := m.list.Title
 	m.list.SetItems(m.list.Items()) // This forces the list to re-render
 	m.list.Title = title // Restore title after refresh
-	m.list.SetShowTitle(true) // Force show title
+	// Title is rendered separately in renderList
 }
 
 // refreshRepositoryList reloads the repository list from disk

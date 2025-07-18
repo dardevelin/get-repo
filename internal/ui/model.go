@@ -270,9 +270,12 @@ func InitialModel(initialState State) Model {
 	l.Title = getListTitle(initialState)
 	l.SetShowHelp(false)
 	l.SetShowStatusBar(false) // Hide status bar like file browser
-	l.SetShowTitle(true) // Keep title for main list
+	l.SetShowTitle(false) // We render title separately now
 	l.SetFilteringEnabled(false) // Disable filtering initially to avoid conflicts
 	l.DisableQuitKeybindings()
+	
+	// Set title styles to ensure visibility
+	l.Styles.Title = TitleStyle
 	
 	// Ensure list starts at the top
 	if len(items) > 0 {
