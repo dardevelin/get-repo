@@ -766,7 +766,7 @@ func (m Model) renderBatchOperation() string {
 	for _, item := range items {
 		if i := item.(Item); i.node != nil && i.node.Status == StatusPending {
 			if !processedRepos[i.node.Path] {
-				pending = append(pending, fmt.Sprintf("  ⏳ %s", i.node.Name))
+				pending = append(pending, fmt.Sprintf("  ••• %s", i.node.Name))
 			}
 		}
 	}

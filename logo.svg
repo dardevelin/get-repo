@@ -1,0 +1,32 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#1a1a2e" stroke="#4ec9b0" stroke-width="2"/>
+  
+  <!-- Folder icon base -->
+  <path d="M40 60 L40 140 L160 140 L160 80 L90 80 L80 60 Z" 
+        fill="none" 
+        stroke="#569cd6" 
+        stroke-width="3" 
+        stroke-linejoin="round"/>
+  
+  <!-- Git branch symbol -->
+  <g transform="translate(100, 100)">
+    <!-- Main branch line -->
+    <line x1="-30" y1="0" x2="30" y2="0" stroke="#4ec9b0" stroke-width="3"/>
+    
+    <!-- Branch fork -->
+    <line x1="-10" y1="0" x2="-10" y2="-20" stroke="#4ec9b0" stroke-width="3"/>
+    <line x1="-10" y1="-20" x2="10" y2="-20" stroke="#4ec9b0" stroke-width="3"/>
+    <line x1="10" y1="-20" x2="10" y2="0" stroke="#4ec9b0" stroke-width="3"/>
+    
+    <!-- Commit nodes -->
+    <circle cx="-30" cy="0" r="5" fill="#4ec9b0"/>
+    <circle cx="-10" cy="0" r="5" fill="#4ec9b0"/>
+    <circle cx="10" cy="0" r="5" fill="#4ec9b0"/>
+    <circle cx="30" cy="0" r="5" fill="#4ec9b0"/>
+    <circle cx="0" cy="-20" r="5" fill="#ffff5f"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="100" y="175" font-family="monospace" font-size="18" text-anchor="middle" fill="#4ec9b0">get-repo</text>
+</svg>

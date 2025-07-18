@@ -142,11 +142,11 @@ func (i Item) Title() string {
 	
 	switch i.status {
 	case StatusPending:
-		statusIcon = "⏳ "
+		statusIcon = "••• " // Three dots for pending
 	case StatusSuccess:
-		statusIcon = "✅ "
+		statusIcon = "✓ " // Simple check mark
 	case StatusFailed:
-		statusIcon = "❌ "
+		statusIcon = "✗ " // Simple X mark
 	default:
 		statusIcon = ""
 	}

@@ -1,8 +1,26 @@
-# get-repo
+<div align="center">
+  <img src="logo.svg" alt="get-repo logo" width="120" height="120">
+  
+  # get-repo
+  
+  **A beautiful, hierarchical TUI for managing your git repositories**
+  
+  [![Go Version](https://img.shields.io/badge/go-%3E%3D1.20-blue.svg)](https://golang.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+</div>
 
-A beautiful, hierarchical TUI for managing your git repositories with tree-based organization and comprehensive CLI support.
+---
 
 `get-repo` provides an elegant terminal interface to browse, clone, update, and manage all your local git repositories. It organizes repositories by VCS provider (github.com, gitlab.com, etc.) in an expandable tree structure while maintaining full command-line functionality.
+
+## Recent Improvements
+
+- **Refined Status Indicators**: Clean unicode symbols (✓ ✗ •••) replace emoji-style icons
+- **Fixed UI Stability**: Title stays visible, no more UI shifting when selecting items
+- **Improved Error Display**: Consolidated error reporting at bottom of screen
+- **Better Selection Visuals**: Removed checkboxes in favor of color highlighting and arrows
+- **Batch Operation Fixes**: All selected items are now properly processed
+- **Inline Async Operations**: Operations run without switching screens
 
 ## Features
 
@@ -10,7 +28,7 @@ A beautiful, hierarchical TUI for managing your git repositories with tree-based
 - **VCS Organization:** Repositories grouped by provider (github.com, gitlab.com, bitbucket.com)
 - **Expandable Nodes:** Use arrow keys to expand/collapse organizations and users
 - **Expansion State Preservation:** Tree structure remains intact during operations
-- **Visual Status Indicators:** Real-time operation feedback with ⏳, ✅, ❌ icons
+- **Visual Status Indicators:** Real-time operation feedback with refined status icons (✓ ✗ •••)
 
 ### 🚀 **Powerful Operations**
 - **Batch Operations:** Select multiple repositories with space bar for bulk updates/removals
@@ -19,9 +37,11 @@ A beautiful, hierarchical TUI for managing your git repositories with tree-based
 - **Safe Removal:** Confirmation prompts prevent accidental deletions
 
 ### 🎨 **Beautiful Interface**
+- **Modern Design:** Clean, minimalist interface with smart color usage
+- **Visual Selection:** Color-coded highlighting with arrow indicators (▸)
 - **Eza-style Colors:** Professional color scheme compatible with common terminal themes
 - **Nerd Font Icons:** Rich iconography for better visual organization
-- **Responsive Design:** Adapts to terminal size changes
+- **Responsive Design:** Adapts to terminal size changes with reserved UI space
 - **File Browser:** Integrated directory selection with visual validation
 
 ### 🛠 **Comprehensive CLI**
@@ -29,6 +49,8 @@ A beautiful, hierarchical TUI for managing your git repositories with tree-based
 - **Shell Completion:** Full autocompletion support for bash, zsh, and fish
 - **URL Detection:** Smart git URL recognition for direct cloning
 - **Setup Wizard:** Guided first-run configuration with file browser
+- **Asynchronous Operations:** Non-blocking UI with inline status updates
+- **Error Consolidation:** Clean error reporting in dedicated UI section
 
 ## Installation
 
