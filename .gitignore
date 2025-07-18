@@ -1,5 +1,5 @@
 # Binaries
-get-repo
+/get-repo
 *.exe
 *.exe~
 *.dll
