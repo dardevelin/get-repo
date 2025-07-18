@@ -26,6 +26,7 @@ const (
 	CommandHelp
 	CommandVersion
 	CommandInteractive
+	CommandCompletion
 )
 
 // ParseArgs parses command line arguments
@@ -87,6 +88,11 @@ func ParseArgs(args []string) (*Command, error) {
 		if len(args) > 1 {
 			cmd.Args = args[1:]
 		}
+	case "completion":
+		cmd.Type = CommandCompletion
+		if len(args) > 1 {
+			cmd.Args = args[1:]
+		}
 	default:
 		return nil, fmt.Errorf("unknown command: %s", firstArg)
 	}
@@ -139,6 +145,7 @@ Usage:
   get-repo update <repo>          Update specific repository
   get-repo remove                 Launch TUI in remove mode
   get-repo remove <repo> [--force] Remove specific repository
+  get-repo completion <shell>     Generate shell completion scripts
 
 Options:
   -i, --interactive    Force interactive TUI mode
@@ -146,9 +153,20 @@ Options:
   -v, --version       Show version information
   --force             Skip confirmation prompts
 
+Completion:
+  get-repo completion bash        Generate bash completion
+  get-repo completion zsh         Generate zsh completion  
+  get-repo completion fish        Generate fish completion
+
 Examples:
   get-repo https://github.com/user/repo
   get-repo list
   get-repo update my-project
-  get-repo remove old-project --force`
+  get-repo remove old-project --force
+  
+  # Install bash completion
+  get-repo completion bash > ~/.bash_completion.d/get-repo
+  
+  # Install zsh completion
+  get-repo completion zsh > ~/.oh-my-zsh/completions/_get-repo`
 }
