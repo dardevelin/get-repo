@@ -134,7 +134,12 @@ func (i Item) Title() string {
 		expandIcon = "  "
 	}
 	
-	// Status indicator
+	// Status indicator - get from node if available
+	if i.node != nil {
+		i.status = i.node.Status
+		i.statusMsg = i.node.StatusMsg
+	}
+	
 	switch i.status {
 	case StatusPending:
 		statusIcon = "⏳ "
@@ -321,6 +326,9 @@ type batchOperationMsg struct {
 	message  string
 }
 type refreshListMsg struct{}
+type repositoryListMsg struct {
+	items []list.Item
+}
 
 // Commands
 func (m Model) cloneRepo(url string) tea.Cmd {

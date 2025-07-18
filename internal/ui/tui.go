@@ -66,12 +66,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case cloneFinishedMsg:
 		if msg.err != nil {
 			m.err = msg.err
-			m.state = StateList
 		} else {
 			m.statusMsg = "Clone completed successfully!"
-			m.state = StateList
-			m.list.Title = "Your Repositories"
+			// Refresh the repository list
+			return m, m.refreshRepositoryList()
 		}
+		m.state = StateList
 		
 	case batchOperationMsg:
 		m.operationMutex.Lock()
@@ -94,9 +94,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		// Check if all operations are complete
 		if m.completedOps >= m.totalOps {
-			m.state = StateList
 			m.statusMsg = m.generateBatchSummary()
-			m.list.Title = "Your Repositories"
 			
 			// Clear all selections after batch operation
 			items := m.list.Items()
@@ -121,6 +119,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list.Title = "Your Repositories"
 		return m, nil
 		
+	case repositoryListMsg:
+		// Update the list with new items
+		currentWidth, currentHeight := m.list.Width(), m.list.Height()
+		currentCursor := m.list.Cursor()
+		
+		m.list.SetItems(msg.items)
+		m.list.SetSize(currentWidth, currentHeight)
+		m.list.Title = "Your Repositories"
+		
+		// Try to maintain cursor position if possible
+		if currentCursor < len(msg.items) {
+			m.list.Select(currentCursor)
+		} else if len(msg.items) > 0 {
+			m.list.Select(0)
+		}
+		
+		return m, nil
+		
 	case error:
 		m.err = msg
 		return m, nil
@@ -140,7 +156,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
 	case StateList:
-		// StateList is handled in handleListKeys, not here
+		// Update spinner if operations are running
+		if m.totalOps > 0 && m.completedOps < m.totalOps {
+			m.spinner, cmd = m.spinner.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+		// List navigation is handled in handleListKeys
 	case StateBatchOperation:
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
@@ -186,15 +207,14 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			
 			// If we have pre-selected items, process them immediately
 			if hasSelections {
-				// Start batch operation
-				m.state = StateBatchOperation
+				// Stay in list state but track operations
 				m.totalOps = len(selectedRepos)
 				m.completedOps = 0
 				m.operationResults = nil // Clear previous results
+				m.list.Title = "Your Repositories" // Ensure title is set
 				
 				// Set pending status for all selected repositories
 				for _, repoPath := range selectedRepos {
-					m.updateNodeStatus(repoPath, false, "")
 					m.setNodePending(repoPath)
 				}
 				
@@ -222,8 +242,9 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.totalOps = 1
 		m.completedOps = 0
 		m.operationResults = nil // Clear previous results
+		m.list.Title = "Your Repositories" // Ensure title is set
 		
-		m.state = StateUpdate
+		// Stay in list state
 		m.statusMsg = fmt.Sprintf("Updating %s...", selectedItem.name)
 		return m, tea.Batch(
 			m.spinner.Tick, // Start spinner animation
@@ -373,15 +394,14 @@ func (m Model) handleRemoveConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y", "Y":
 		// Check if this is a batch removal
 		if len(m.batchRemoveRepos) > 0 {
-			// Start batch operation
-			m.state = StateBatchOperation
+			// Stay in list state but track operations
+			m.state = StateList
 			m.totalOps = len(m.batchRemoveRepos)
 			m.completedOps = 0
 			m.operationResults = nil
 			
 			// Set pending status for all selected repositories
 			for _, repoPath := range m.batchRemoveRepos {
-				m.updateNodeStatus(repoPath, false, "")
 				m.setNodePending(repoPath)
 			}
 			
@@ -464,15 +484,14 @@ func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		
-		// Start batch operation
-		m.state = StateBatchOperation
+		// Stay in list state but track operations
+		m.state = StateList
 		m.totalOps = len(selectedRepos)
 		m.completedOps = 0
 		m.operationResults = nil
 		
 		// Set pending status for all selected repositories
 		for _, repoName := range selectedRepos {
-			m.updateNodeStatus(repoName, false, "")
 			m.setNodePending(repoName)
 		}
 		
@@ -596,8 +615,15 @@ func (m Model) renderList() string {
 	content := lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 	help := m.getListHelp()
 	
+	var bottomSection string
+	
+	// Show operation progress if running
+	if m.totalOps > 0 && m.completedOps < m.totalOps {
+		progress := fmt.Sprintf("\n\nOperations: %d/%d completed", m.completedOps, m.totalOps)
+		bottomSection = PendingStyle.Render(progress)
+	}
+	
 	// Show any recent operation results at the bottom
-	var resultSection string
 	if len(m.operationResults) > 0 && m.state == StateList {
 		var recentErrors []string
 		for _, result := range m.operationResults {
@@ -611,12 +637,15 @@ func (m Model) renderList() string {
 		}
 		
 		if len(recentErrors) > 0 {
-			resultSection = "\n\n" + ErrorStyle.Render("Recent Errors:") + "\n" + 
+			if bottomSection != "" {
+				bottomSection += "\n"
+			}
+			bottomSection += "\n" + ErrorStyle.Render("Recent Errors:") + "\n" + 
 				ErrorStyle.Render(strings.Join(recentErrors, "\n"))
 		}
 	}
 	
-	return content + "\n" + help + resultSection
+	return content + "\n" + help + bottomSection
 }
 
 func (m Model) renderSelection() string {
@@ -903,4 +932,23 @@ func (m *Model) refreshTreeDisplay() {
 	
 	// Force a refresh to ensure the new status indicators are rendered
 	m.list.SetItems(m.list.Items()) // This forces the list to re-render
+}
+
+// refreshRepositoryList reloads the repository list from disk
+func (m Model) refreshRepositoryList() tea.Cmd {
+	return func() tea.Msg {
+		// Scan for repositories
+		repos, err := m.manager.List()
+		if err != nil {
+			return error(fmt.Errorf("failed to scan repositories: %w", err))
+		}
+		
+		// Build tree structure from repositories
+		tree := buildRepositoryTree(repos)
+		
+		// Convert tree to flat list for display
+		items := flattenTree(tree)
+		
+		return repositoryListMsg{items: items}
+	}
 }
