@@ -28,6 +28,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		} else {
 			// Update list size for other states
+			// Account for margins in the view
 			h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 			width, height := msg.Width-h, msg.Height-v
 			if width < 20 {
@@ -37,6 +38,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				height = 10
 			}
 			m.list.SetSize(width, height)
+			// Ensure title is shown after resize
+			m.list.SetShowTitle(true)
 		}
 		
 	case tea.KeyMsg:
@@ -112,6 +115,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
 			m.list.Title = currentTitle // Preserve title
+			m.list.SetShowTitle(true) // Force show title
 		}
 		m.operationMutex.Unlock()
 		
@@ -158,10 +162,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
 	case StateList:
-		// Ensure title is always set
+		// Ensure title is always set and shown
 		if m.list.Title == "" {
 			m.list.Title = "Your Repositories"
 		}
+		m.list.SetShowTitle(true) // Force title to be shown
 		// Update spinner if operations are running
 		if m.totalOps > 0 && m.completedOps < m.totalOps {
 			m.spinner, cmd = m.spinner.Update(msg)
@@ -310,10 +315,15 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			currentWidth, currentHeight := m.list.Width(), m.list.Height()
 			currentCursor := m.list.Cursor()
 			currentTitle := m.list.Title
+			currentShowTitle := m.list.ShowTitle()
+			debug.Log("Before SetItems - Title: '%s', ShowTitle: %v, Width: %d, Height: %d", currentTitle, currentShowTitle, currentWidth, currentHeight)
 			m.list.SetItems(newItems)
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
 			m.list.Title = currentTitle // Preserve title
+			m.list.SetShowTitle(true) // Force show title
+			m.list.SetShowTitle(true) // Force show title
+			debug.Log("After SetItems - Title: '%s', ShowTitle: %v", m.list.Title, m.list.ShowTitle())
 			
 			// Update status message with current selection count
 			selectedCount := 0
@@ -948,6 +958,7 @@ func (m *Model) refreshTreeDisplay() {
 	title := m.list.Title
 	m.list.SetItems(m.list.Items()) // This forces the list to re-render
 	m.list.Title = title // Restore title after refresh
+	m.list.SetShowTitle(true) // Force show title
 }
 
 // refreshRepositoryList reloads the repository list from disk
