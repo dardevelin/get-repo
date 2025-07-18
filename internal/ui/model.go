@@ -182,13 +182,7 @@ func (i Item) Title() string {
 	// Build the title with status
 	title := fmt.Sprintf("%s%s%s%s%s %s", checkbox, indent, expandIcon, statusIcon, typeIcon, i.name)
 	
-	// Add status message if there's an error
-	if i.status == StatusFailed && i.statusMsg != "" {
-		title += lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ff8080")).
-			Italic(true).
-			Render(fmt.Sprintf(" (%s)", i.statusMsg))
-	}
+	// Don't show error message inline - it's shown at the bottom
 	
 	return style.Render(title)
 }
