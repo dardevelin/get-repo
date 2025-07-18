@@ -107,9 +107,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Preserve list state when updating items
 			currentWidth, currentHeight := m.list.Width(), m.list.Height()
 			currentCursor := m.list.Cursor()
+			currentTitle := m.list.Title
 			m.list.SetItems(newItems)
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
+			m.list.Title = currentTitle // Preserve title
 		}
 		m.operationMutex.Unlock()
 		
@@ -156,6 +158,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
 	case StateList:
+		// Ensure title is always set
+		if m.list.Title == "" {
+			m.list.Title = "Your Repositories"
+		}
 		// Update spinner if operations are running
 		if m.totalOps > 0 && m.completedOps < m.totalOps {
 			m.spinner, cmd = m.spinner.Update(msg)
@@ -303,9 +309,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Preserve list state when updating items
 			currentWidth, currentHeight := m.list.Width(), m.list.Height()
 			currentCursor := m.list.Cursor()
+			currentTitle := m.list.Title
 			m.list.SetItems(newItems)
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
+			m.list.Title = currentTitle // Preserve title
 			
 			// Update status message with current selection count
 			selectedCount := 0
@@ -334,9 +342,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Preserve list state when updating items
 		currentWidth, currentHeight := m.list.Width(), m.list.Height()
 		currentCursor := m.list.Cursor()
+		currentTitle := m.list.Title
 		m.list.SetItems(newItems)
 		m.list.SetSize(currentWidth, currentHeight)
 		m.list.Select(currentCursor)
+		m.list.Title = currentTitle // Preserve title
 		m.statusMsg = fmt.Sprintf("All %d items selected", len(items))
 		return m, nil
 	case "n":
@@ -351,9 +361,11 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Preserve list state when updating items
 		currentWidth, currentHeight := m.list.Width(), m.list.Height()
 		currentCursor := m.list.Cursor()
+		currentTitle := m.list.Title
 		m.list.SetItems(newItems)
 		m.list.SetSize(currentWidth, currentHeight)
 		m.list.Select(currentCursor)
+		m.list.Title = currentTitle // Preserve title
 		m.statusMsg = ""
 		return m, nil
 	case "right", "l":
@@ -828,8 +840,10 @@ func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
 	
 	// Preserve list state
 	currentWidth, currentHeight := m.list.Width(), m.list.Height()
+	currentTitle := m.list.Title
 	m.list.SetItems(newItems)
 	m.list.SetSize(currentWidth, currentHeight)
+	m.list.Title = currentTitle // Preserve title
 	
 	// Try to keep cursor on the same item (by name)
 	for i, newItem := range newItems {
@@ -931,7 +945,9 @@ func (m *Model) refreshTreeDisplay() {
 	}
 	
 	// Force a refresh to ensure the new status indicators are rendered
+	title := m.list.Title
 	m.list.SetItems(m.list.Items()) // This forces the list to re-render
+	m.list.Title = title // Restore title after refresh
 }
 
 // refreshRepositoryList reloads the repository list from disk
