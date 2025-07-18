@@ -107,17 +107,17 @@ type Item struct {
 }
 
 func (i Item) Title() string {
-	var checkbox string
 	var expandIcon string
 	var typeIcon string
 	var statusIcon string
 	var color string
+	var selectionIndicator string
 	
-	// Selection indicator
+	// Selection indicator - only show for selected items
 	if i.selected {
-		checkbox = "[✓] "
+		selectionIndicator = "▸ " // Right-pointing triangle
 	} else {
-		checkbox = "[ ] "
+		selectionIndicator = "  "
 	}
 	
 	// Indentation based on tree level
@@ -176,11 +176,11 @@ func (i Item) Title() string {
 	// Apply selection styling if selected
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
 	if i.selected {
-		style = style.Bold(true)
+		style = style.Bold(true).Background(lipgloss.Color("#264f78")) // Highlight background
 	}
 	
 	// Build the title with status
-	title := fmt.Sprintf("%s%s%s%s%s %s", checkbox, indent, expandIcon, statusIcon, typeIcon, i.name)
+	title := fmt.Sprintf("%s%s%s%s%s %s", selectionIndicator, indent, expandIcon, statusIcon, typeIcon, i.name)
 	
 	// Don't show error message inline - it's shown at the bottom
 	

@@ -687,7 +687,7 @@ func (m Model) renderSelection() string {
 	lines = append(lines, TitleStyle.Render(title))
 	lines = append(lines, "")
 	
-	// Render items with checkboxes
+	// Render items with selection indicators
 	start := 0
 	if cursor > 10 {
 		start = cursor - 10
@@ -698,17 +698,28 @@ func (m Model) renderSelection() string {
 	}
 	
 	for i := start; i < end; i++ {
-		checkbox := "[ ]"
-		if _, selected := m.selected[i]; selected {
-			checkbox = "[x]"
-		}
+		item := items[i].(Item)
+		_, isSelected := m.selected[i]
 		
-		line := fmt.Sprintf("%s %s", checkbox, items[i].(Item).name)
-		
+		var line string
 		if i == cursor {
-			line = SelectedItemStyle.Render("→ " + line)
+			// Current cursor position
+			if isSelected {
+				line = SelectedItemStyle.Render("▶ " + item.name) // Filled arrow for cursor + selected
+			} else {
+				line = SelectedItemStyle.Render("▷ " + item.name) // Hollow arrow for cursor only
+			}
 		} else {
-			line = "  " + line
+			// Not at cursor
+			if isSelected {
+				// Selected item - highlight with different style
+				line = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#ffffff")).
+					Background(lipgloss.Color("#1a3a52")).
+					Render("  ▸ " + item.name)
+			} else {
+				line = "    " + item.name
+			}
 		}
 		
 		lines = append(lines, line)
