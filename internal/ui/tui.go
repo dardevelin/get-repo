@@ -30,7 +30,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Update list size for other states
 			// Account for margins in the view
 			h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
-			width, height := msg.Width-h, msg.Height-v
+			width := msg.Width - h
+			height := msg.Height - v
+			
+			// Reserve space for UI elements:
+			// - 1 line for help text  
+			// - 3 lines for status message area (includes spacing)
+			// - 2 extra lines for safety (progress, errors)
+			// This prevents UI shifting when status appears
+			reservedHeight := 6
+			height = height - reservedHeight
+			
 			if width < 20 {
 				width = 20
 			}
@@ -578,10 +588,7 @@ func (m Model) View() string {
 		s = "Unknown state"
 	}
 	
-	// Add status message if present
-	if m.statusMsg != "" && m.state == StateList {
-		s += "\n\n" + SuccessStyle.Render(m.statusMsg)
-	}
+	// Status message is now handled in renderList to prevent shifting
 	
 	return s
 }
@@ -652,7 +659,16 @@ func (m Model) renderList() string {
 		}
 	}
 	
-	return content + "\n" + help + bottomSection
+	// Always include status area to prevent UI shifting
+	statusArea := ""
+	if m.statusMsg != "" {
+		statusArea = "\n\n" + SuccessStyle.Render(m.statusMsg)
+	} else {
+		// Reserve space even when no status
+		statusArea = "\n\n "
+	}
+	
+	return content + "\n" + help + bottomSection + statusArea
 }
 
 func (m Model) renderSelection() string {
