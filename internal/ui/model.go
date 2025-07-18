@@ -58,6 +58,9 @@ type Model struct {
 	completedOps  int
 	operationResults []OperationResult
 	operationMutex   sync.Mutex
+	
+	// Batch removal tracking
+	batchRemoveRepos []string
 }
 
 // OperationResult tracks the result of a batch operation
@@ -340,7 +343,12 @@ func (m Model) cloneRepo(url string) tea.Cmd {
 
 func (m Model) updateRepo(repoName string) tea.Cmd {
 	return func() tea.Msg {
+		debug.Log("updateRepo command starting for: %s", repoName)
 		repoPath := m.manager.GetFullPath(repoName)
+		debug.Log("Full repo path: %s", repoPath)
+		
+		// Mark as pending immediately
+		debug.Log("Starting git pull...")
 		result := m.git.Pull(repoPath)
 		
 		var message string

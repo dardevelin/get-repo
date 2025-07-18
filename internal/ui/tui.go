@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"get-repo/internal/debug"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -40,6 +41,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case tea.KeyMsg:
 		// Global key handling
+		debug.Log("Key pressed: %s in state %v", msg.String(), m.state)
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -95,6 +97,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = StateList
 			m.statusMsg = m.generateBatchSummary()
 			m.list.Title = "Your Repositories"
+			
+			// Clear all selections after batch operation
+			items := m.list.Items()
+			newItems := make([]list.Item, len(items))
+			for i, listItem := range items {
+				item := listItem.(Item)
+				item.selected = false
+				newItems[i] = item
+			}
+			// Preserve list state when updating items
+			currentWidth, currentHeight := m.list.Width(), m.list.Height()
+			currentCursor := m.list.Cursor()
+			m.list.SetItems(newItems)
+			m.list.SetSize(currentWidth, currentHeight)
+			m.list.Select(currentCursor)
 		}
 		m.operationMutex.Unlock()
 		
@@ -153,18 +170,91 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Go to multi-select mode - preserve current model state
 			m.state = StateUpdateSelection
 			m.list.Title = "Select repositories to update (Space to toggle, Enter to confirm)"
+			
+			// Check if we have pre-selected items from the main list
+			items := m.list.Items()
+			hasSelections := false
+			selectedRepos := []string{}
+			
+			for _, listItem := range items {
+				item := listItem.(Item)
+				if item.selected && item.isGitRepo {
+					hasSelections = true
+					selectedRepos = append(selectedRepos, item.node.Path)
+				}
+			}
+			
+			// If we have pre-selected items, process them immediately
+			if hasSelections {
+				// Start batch operation
+				m.state = StateBatchOperation
+				m.totalOps = len(selectedRepos)
+				m.completedOps = 0
+				m.operationResults = nil
+				
+				// Set pending status for all selected repositories
+				for _, repoPath := range selectedRepos {
+					m.updateNodeStatus(repoPath, false, "")
+					m.setNodePending(repoPath)
+				}
+				
+				// Create commands for each repo
+				var cmds []tea.Cmd
+				for _, repoPath := range selectedRepos {
+					cmds = append(cmds, m.updateRepo(repoPath))
+				}
+				
+				cmds = append(cmds, m.spinner.Tick)
+				return m, tea.Batch(cmds...)
+			}
+			
 			return m, nil
 		}
 		// Update single item
+		selectedItem := m.list.SelectedItem().(Item)
+		// Use the full path from the node for git repos
+		repoPath := selectedItem.node.Path
+		
+		// Set pending status immediately so user sees feedback
+		m.setNodePending(repoPath)
+		
+		// Initialize batch operation tracking for single operation
+		m.totalOps = 1
+		m.completedOps = 0
+		m.operationResults = nil
+		
 		m.state = StateUpdate
-		repoName := m.list.SelectedItem().(Item).name
-		m.statusMsg = fmt.Sprintf("Updating %s...", repoName)
-		return m, m.updateRepo(repoName)
+		m.statusMsg = fmt.Sprintf("Updating %s...", selectedItem.name)
+		return m, tea.Batch(
+			m.spinner.Tick, // Start spinner animation
+			m.updateRepo(repoPath),
+		)
 	case "r":
 		if m.list.SelectedItem() == nil {
 			// Go to multi-select mode - preserve current model state
 			m.state = StateRemoveSelection
 			m.list.Title = "Select repositories to remove (Space to toggle, Enter to confirm)"
+			
+			// Check if we have pre-selected items from the main list
+			items := m.list.Items()
+			hasSelections := false
+			selectedRepos := []string{}
+			
+			for _, listItem := range items {
+				item := listItem.(Item)
+				if item.selected && item.isGitRepo {
+					hasSelections = true
+					selectedRepos = append(selectedRepos, item.node.Path)
+				}
+			}
+			
+			// If we have pre-selected items, confirm removal
+			if hasSelections {
+				m.state = StateRemoveConfirm
+				m.batchRemoveRepos = selectedRepos
+				return m, nil
+			}
+			
 			return m, nil
 		}
 		// Confirm single removal
@@ -281,12 +371,42 @@ func (m Model) handleCloneKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleRemoveConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
-		repoName := m.list.SelectedItem().(Item).name
+		// Check if this is a batch removal
+		if len(m.batchRemoveRepos) > 0 {
+			// Start batch operation
+			m.state = StateBatchOperation
+			m.totalOps = len(m.batchRemoveRepos)
+			m.completedOps = 0
+			m.operationResults = nil
+			
+			// Set pending status for all selected repositories
+			for _, repoPath := range m.batchRemoveRepos {
+				m.updateNodeStatus(repoPath, false, "")
+				m.setNodePending(repoPath)
+			}
+			
+			// Create commands for each repo
+			var cmds []tea.Cmd
+			for _, repoPath := range m.batchRemoveRepos {
+				cmds = append(cmds, m.removeRepo(repoPath))
+			}
+			
+			// Clear batch list after starting operation
+			m.batchRemoveRepos = nil
+			
+			cmds = append(cmds, m.spinner.Tick)
+			return m, tea.Batch(cmds...)
+		}
+		
+		// Single removal
+		selectedItem := m.list.SelectedItem().(Item)
+		repoPath := selectedItem.node.Path
 		m.state = StateUpdate
-		m.statusMsg = fmt.Sprintf("Removing %s...", repoName)
-		return m, m.removeRepo(repoName)
+		m.statusMsg = fmt.Sprintf("Removing %s...", selectedItem.name)
+		return m, m.removeRepo(repoPath)
 	default:
 		m.state = StateList
+		m.batchRemoveRepos = nil // Clear batch list if cancelled
 		return m, nil
 	}
 }
@@ -333,7 +453,9 @@ func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		
 		for idx := range m.selected {
 			if idx < len(items) {
-				selectedRepos = append(selectedRepos, items[idx].(Item).name)
+				item := items[idx].(Item)
+				// Use the full path from the node for git repos
+				selectedRepos = append(selectedRepos, item.node.Path)
 			}
 		}
 		
@@ -454,6 +576,15 @@ func (m Model) renderSpinner() string {
 }
 
 func (m Model) renderRemoveConfirm() string {
+	// Check if this is a batch removal
+	if len(m.batchRemoveRepos) > 0 {
+		return fmt.Sprintf(
+			"\n\n   %s\n   This action cannot be undone.\n\n   [y/N]\n\n",
+			fmt.Sprintf("Are you sure you want to remove %d repositories?", len(m.batchRemoveRepos)),
+		)
+	}
+	
+	// Single removal
 	selected := m.list.SelectedItem().(Item).name
 	return fmt.Sprintf(
 		"\n\n   %s\n   This action cannot be undone.\n\n   [y/N]\n\n",
