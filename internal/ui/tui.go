@@ -110,12 +110,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Preserve list state when updating items
 			currentWidth, currentHeight := m.list.Width(), m.list.Height()
 			currentCursor := m.list.Cursor()
-			currentTitle := m.list.Title
 			m.list.SetItems(newItems)
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
-			m.list.Title = currentTitle // Preserve title
-			// Title is rendered separately in renderList
 		}
 		m.operationMutex.Unlock()
 		
@@ -162,11 +159,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 		cmds = append(cmds, cmd)
 	case StateList:
-		// Ensure title is always set and shown
-		if m.list.Title == "" {
-			m.list.Title = "Your Repositories"
-		}
-		// Title is rendered separately in renderList
+		// List navigation and updates
 		// Update spinner if operations are running
 		if m.totalOps > 0 && m.completedOps < m.totalOps {
 			m.spinner, cmd = m.spinner.Update(msg)
@@ -217,7 +210,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.totalOps = len(selectedRepos)
 			m.completedOps = 0
 			m.operationResults = nil // Clear previous results
-			m.list.Title = "Your Repositories" // Ensure title is set
+			// Process batch update
 			
 			// Set pending status for all selected repositories
 			for _, repoPath := range selectedRepos {
@@ -237,7 +230,6 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If no selections and no item under cursor, go to selection mode
 		if m.list.SelectedItem() == nil {
 			m.state = StateUpdateSelection
-			m.list.Title = "Select repositories to update (Space to toggle, Enter to confirm)"
 			return m, nil
 		}
 		// Update single item
@@ -284,7 +276,6 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If no selections and no item under cursor, go to selection mode
 		if m.list.SelectedItem() == nil {
 			m.state = StateRemoveSelection
-			m.list.Title = "Select repositories to remove (Space to toggle, Enter to confirm)"
 			return m, nil
 		}
 		
@@ -313,16 +304,10 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Preserve list state when updating items
 			currentWidth, currentHeight := m.list.Width(), m.list.Height()
 			currentCursor := m.list.Cursor()
-			currentTitle := m.list.Title
-			currentShowTitle := m.list.ShowTitle()
-			debug.Log("Before SetItems - Title: '%s', ShowTitle: %v, Width: %d, Height: %d", currentTitle, currentShowTitle, currentWidth, currentHeight)
+			// Update the list items
 			m.list.SetItems(newItems)
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
-			m.list.Title = currentTitle // Preserve title
-			// Title is rendered separately in renderList
-			// Title is rendered separately in renderList
-			debug.Log("After SetItems - Title: '%s', ShowTitle: %v", m.list.Title, m.list.ShowTitle())
 			
 			// Update status message with current selection count
 			selectedCount := 0
@@ -633,20 +618,8 @@ func (m Model) renderRemoveConfirm() string {
 }
 
 func (m Model) renderList() string {
-	// Render title separately to ensure it's always shown
-	title := TitleStyle.Render("Your Repositories")
-	
-	// Get the list view without margins first
-	listView := m.list.View()
-	
-	// Apply margins to the list content
-	content := lipgloss.NewStyle().Margin(0, 2).Render(listView)
-	
-	// Combine title and content
-	fullContent := lipgloss.JoinVertical(lipgloss.Left, 
-		lipgloss.NewStyle().Margin(1, 2, 0, 2).Render(title),
-		content)
-	
+	// Get the list view
+	content := lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 	help := m.getListHelp()
 	
 	var bottomSection string
@@ -679,7 +652,7 @@ func (m Model) renderList() string {
 		}
 	}
 	
-	return fullContent + "\n" + help + bottomSection
+	return content + "\n" + help + bottomSection
 }
 
 func (m Model) renderSelection() string {
@@ -688,8 +661,14 @@ func (m Model) renderSelection() string {
 	items := m.list.Items()
 	cursor := m.list.Cursor()
 	
-	// Add title
-	lines = append(lines, TitleStyle.Render(m.list.Title))
+	// Add title based on state
+	title := "Your Repositories"
+	if m.state == StateUpdateSelection {
+		title = "Select repositories to update (Space to toggle, Enter to confirm)"
+	} else if m.state == StateRemoveSelection {
+		title = "Select repositories to remove (Space to toggle, Enter to confirm)"
+	}
+	lines = append(lines, TitleStyle.Render(title))
 	lines = append(lines, "")
 	
 	// Render items with checkboxes
@@ -967,10 +946,7 @@ func (m *Model) refreshTreeDisplay() {
 	}
 	
 	// Force a refresh to ensure the new status indicators are rendered
-	title := m.list.Title
 	m.list.SetItems(m.list.Items()) // This forces the list to re-render
-	m.list.Title = title // Restore title after refresh
-	// Title is rendered separately in renderList
 }
 
 // refreshRepositoryList reloads the repository list from disk

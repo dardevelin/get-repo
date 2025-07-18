@@ -267,10 +267,10 @@ func InitialModel(initialState State) Model {
 	delegate.Styles.FilterMatch = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ec9b0"))
 	
 	l := list.New(items, delegate, 80, 20) // Start with reasonable size like file browser
-	l.Title = getListTitle(initialState)
+	l.Title = "Your Repositories"
 	l.SetShowHelp(false)
 	l.SetShowStatusBar(false) // Hide status bar like file browser
-	l.SetShowTitle(false) // We render title separately now
+	l.SetShowTitle(true) // Show title
 	l.SetFilteringEnabled(false) // Disable filtering initially to avoid conflicts
 	l.DisableQuitKeybindings()
 	
