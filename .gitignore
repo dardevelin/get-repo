@@ -17,8 +17,21 @@ get-repo
 *.log
 debug.log
 
-# Signing configuration (contains secrets)
-scripts/sign-config.sh
+# Scripts directory (moved to separate repo)
+scripts/
+
+# Notarization artifacts
+notarization.json
+status.json
+
+# Certificate and key files (security sensitive)
+*.p12
+*.key
+*.csr
+*.cer
+*.pem
+DeveloperID.*
+developer_id.*
 
 # IDE files
 .vscode/
