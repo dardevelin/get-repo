@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"get-repo/config"
+	"get-repo/internal/debug"
 	"get-repo/internal/repo"
 	"os"
 	"path/filepath"
@@ -189,13 +190,22 @@ func (i Item) FilterValue() string { return i.name }
 
 // InitialModel creates the initial model
 func InitialModel(initialState State) Model {
+	defer debug.LogFunction("InitialModel")()
+	debug.Log("Creating initial model with state: %v", initialState)
+	
 	cfg, err := config.Load()
 	if err != nil {
+		debug.LogError(err, "loading config in InitialModel")
 		return Model{err: err}
 	}
+	debug.Log("Config loaded: CodebasesPath='%s'", cfg.CodebasesPath)
 	
 	// Check if this is a first run
-	if config.IsFirstRun() || cfg.CodebasesPath == "" {
+	isFirstRun := config.IsFirstRun()
+	debug.Log("IsFirstRun: %v, CodebasesPath empty: %v", isFirstRun, cfg.CodebasesPath == "")
+	
+	if isFirstRun || cfg.CodebasesPath == "" {
+		debug.Log("Entering setup mode")
 		return Model{
 			state:       StateSetup,
 			config:      cfg,
@@ -204,25 +214,34 @@ func InitialModel(initialState State) Model {
 	}
 	
 	// Initialize managers
+	debug.Log("Initializing managers with CodebasesPath: %s", cfg.CodebasesPath)
 	manager := repo.NewManager(cfg.CodebasesPath)
 	git := repo.NewGit(cfg.CodebasesPath)
 	
 	// Scan for repositories
+	debug.Log("Scanning for repositories...")
 	repos, err := manager.List()
 	if err != nil {
+		debug.LogError(err, "scanning repositories")
 		return Model{err: fmt.Errorf("failed to scan repositories: %w", err)}
 	}
+	debug.Log("Found %d repositories", len(repos))
 	
 	// Debug: Check if we found repositories
 	if len(repos) == 0 {
+		debug.Log("No repositories found in path: %s", cfg.CodebasesPath)
 		return Model{err: fmt.Errorf("no repositories found in: %s", cfg.CodebasesPath)}
 	}
 	
 	// Build tree structure from repositories
+	debug.Log("Building repository tree...")
 	tree := buildRepositoryTree(repos)
+	debug.Log("Built tree with %d root nodes", len(tree))
 	
 	// Convert tree to flat list for display
+	debug.Log("Flattening tree for display...")
 	items := flattenTree(tree)
+	debug.Log("Created %d list items", len(items))
 	
 	// Create list with proper dimensions
 	delegate := list.NewDefaultDelegate()

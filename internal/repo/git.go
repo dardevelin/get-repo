@@ -3,6 +3,7 @@ package repo
 import (
 	"bytes"
 	"fmt"
+	"get-repo/internal/debug"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,14 +50,28 @@ func (g *Git) Clone(url, destination string) GitOperation {
 
 // Pull updates a repository
 func (g *Git) Pull(repoPath string) GitOperation {
+	defer debug.LogFunction("Git.Pull")()
+	debug.Log("Pulling repository at: %s", repoPath)
+	
 	cmd := exec.Command("git", "-C", repoPath, "pull")
+	debug.Log("Executing command: %s", cmd.String())
+	
 	output, err := g.runCommand(cmd)
 	
-	return GitOperation{
+	result := GitOperation{
 		Success: err == nil,
 		Output:  output,
 		Error:   err,
 	}
+	
+	if err != nil {
+		debug.LogError(err, fmt.Sprintf("git pull failed for %s", repoPath))
+	} else {
+		debug.Log("Git pull successful for %s", repoPath)
+	}
+	debug.Log("Git pull output: %s", output)
+	
+	return result
 }
 
 // Status gets the status of a repository

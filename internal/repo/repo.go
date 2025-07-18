@@ -2,6 +2,7 @@ package repo
 
 import (
 	"fmt"
+	"get-repo/internal/debug"
 	"io/fs"
 	"net/url"
 	"os"
@@ -29,12 +30,23 @@ func NewManager(basePath string) *Manager {
 
 // List returns all directories and repositories found under the base path
 func (m *Manager) List() ([]Repository, error) {
+	defer debug.LogFunction("Manager.List")()
+	debug.Log("Scanning base path: %s", m.basePath)
+	
 	var repos []Repository
 	visited := make(map[string]bool) // Track visited paths to avoid duplicates
 	
+	// Check if base path exists
+	if _, err := os.Stat(m.basePath); os.IsNotExist(err) {
+		debug.Log("Base path does not exist: %s", m.basePath)
+		return nil, fmt.Errorf("base path does not exist: %s", m.basePath)
+	}
+	
 	// First pass: Find all git repositories
+	debug.Log("First pass: scanning for git repositories...")
 	err := filepath.WalkDir(m.basePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			debug.LogError(err, fmt.Sprintf("walking path %s", path))
 			return err
 		}
 		
@@ -42,9 +54,11 @@ func (m *Manager) List() ([]Repository, error) {
 			repoPath := filepath.Dir(path)
 			relPath, err := filepath.Rel(m.basePath, repoPath)
 			if err != nil {
+				debug.LogError(err, fmt.Sprintf("getting relative path for %s", repoPath))
 				return err
 			}
 			
+			debug.Log("Found git repository: %s", relPath)
 			repos = append(repos, Repository{
 				Name:     relPath,
 				Path:     repoPath,
@@ -59,12 +73,16 @@ func (m *Manager) List() ([]Repository, error) {
 	})
 	
 	if err != nil {
+		debug.LogError(err, "first pass walkdir")
 		return nil, err
 	}
+	debug.Log("First pass complete, found %d git repositories", len(repos))
 	
 	// Second pass: Find all directories (including organizational folders)
+	debug.Log("Second pass: scanning for organizational directories...")
 	err = filepath.WalkDir(m.basePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			debug.LogError(err, fmt.Sprintf("walking path %s in second pass", path))
 			return err
 		}
 		
@@ -76,22 +94,26 @@ func (m *Manager) List() ([]Repository, error) {
 		if d.IsDir() && d.Name() != ".git" {
 			relPath, err := filepath.Rel(m.basePath, path)
 			if err != nil {
+				debug.LogError(err, fmt.Sprintf("getting relative path for %s in second pass", path))
 				return err
 			}
 			
 			// Skip if we already found this as a git repository
 			if visited[relPath] {
+				debug.Log("Skipping already visited path: %s", relPath)
 				return filepath.SkipDir
 			}
 			
 			// Skip hidden directories and nested paths of git repos
 			if strings.HasPrefix(d.Name(), ".") {
+				debug.Log("Skipping hidden directory: %s", relPath)
 				return filepath.SkipDir
 			}
 			
 			// Only show top-level directories and direct subdirectories
 			pathParts := strings.Split(relPath, string(filepath.Separator))
 			if len(pathParts) <= 2 { // e.g., "gitlab.com" or "github.com/user"
+				debug.Log("Found organizational directory: %s", relPath)
 				repos = append(repos, Repository{
 					Name:     relPath,
 					Path:     path,
@@ -104,6 +126,10 @@ func (m *Manager) List() ([]Repository, error) {
 		return nil
 	})
 	
+	if err != nil {
+		debug.LogError(err, "second pass walkdir")
+	}
+	debug.Log("Repository scan complete, total found: %d", len(repos))
 	return repos, err
 }
 

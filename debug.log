@@ -1,0 +1,82 @@
+2025/07/18 03:57:26.192084 === DEBUG SESSION STARTED ===
+2025/07/18 03:57:26.193555 [debug.go:48] ENTER: main
+2025/07/18 03:57:26.193569 [main.go:134] Application starting with args: []
+2025/07/18 03:57:26.193588 [main.go:145] Parsed command type: 0
+2025/07/18 03:57:26.193593 [main.go:164] Loading configuration...
+2025/07/18 03:57:26.193740 [main.go:171] Configuration loaded: CodebasesPath=/Users/dbrasdasilva/dev/vcs-codebases
+2025/07/18 03:57:26.193746 [main.go:182] Command needs interactive TUI, launching...
+2025/07/18 03:57:26.193768 [debug.go:48] ENTER: runTUI
+2025/07/18 03:57:26.193773 [main.go:235] Starting TUI with initial state: 0
+2025/07/18 03:57:26.193777 [main.go:250] Creating UI model...
+2025/07/18 03:57:26.193857 [debug.go:48] ENTER: InitialModel
+2025/07/18 03:57:26.193862 [model.go:194] Creating initial model with state: 0
+2025/07/18 03:57:26.193888 [model.go:201] Config loaded: CodebasesPath='/Users/dbrasdasilva/dev/vcs-codebases'
+2025/07/18 03:57:26.193898 [model.go:205] IsFirstRun: false, CodebasesPath empty: false
+2025/07/18 03:57:26.193902 [model.go:217] Initializing managers with CodebasesPath: /Users/dbrasdasilva/dev/vcs-codebases
+2025/07/18 03:57:26.193906 [model.go:222] Scanning for repositories...
+2025/07/18 03:57:26.193928 [debug.go:48] ENTER: Manager.List
+2025/07/18 03:57:26.193941 [repo.go:34] Scanning base path: /Users/dbrasdasilva/dev/vcs-codebases
+2025/07/18 03:57:26.193948 [repo.go:46] First pass: scanning for git repositories...
+2025/07/18 03:57:26.194159 [repo.go:61] Found git repository: github.com/RPi-Distro/pi-gen
+2025/07/18 03:57:26.195744 [repo.go:61] Found git repository: github.com/alphacep/vosk-api
+2025/07/18 03:57:26.198698 [repo.go:61] Found git repository: github.com/alphacep/vosk-server
+2025/07/18 03:57:26.200009 [repo.go:61] Found git repository: github.com/burakorkmez/realtime-spotify-clone
+2025/07/18 03:57:26.201607 [repo.go:61] Found git repository: github.com/dardevelin/Kekbar
+2025/07/18 03:57:26.201814 [repo.go:61] Found git repository: github.com/dardevelin/gensystray
+2025/07/18 03:57:26.201874 [repo.go:61] Found git repository: github.com/dardevelin/get-repo
+2025/07/18 03:57:26.202191 [repo.go:61] Found git repository: github.com/dardevelin/googletest
+2025/07/18 03:57:26.203834 [repo.go:61] Found git repository: github.com/dardevelin/libmumble
+2025/07/18 03:57:26.204001 [repo.go:61] Found git repository: github.com/dardevelin/libmumble/_dependencies/cmake_compiler_flags-src
+2025/07/18 03:57:26.205040 [repo.go:61] Found git repository: github.com/dardevelin/libmumble/_dependencies/googletest-src
+2025/07/18 03:57:26.206773 [repo.go:61] Found git repository: github.com/dardevelin/libmumble/_dependencies/gsl-src
+2025/07/18 03:57:26.208308 [repo.go:61] Found git repository: github.com/dardevelin/libmumble/_dependencies/quickpool-src
+2025/07/18 03:57:26.219828 [repo.go:61] Found git repository: github.com/dardevelin/mumble
+2025/07/18 03:57:26.225963 [repo.go:61] Found git repository: github.com/dardevelin/pifi
+2025/07/18 03:57:26.226508 [repo.go:61] Found git repository: github.com/dardevelin/tide
+2025/07/18 03:57:26.288411 [repo.go:61] Found git repository: github.com/dardevelin/tide/plugins/gui-swiftui/.build/checkouts/MessagePack
+2025/07/18 03:57:26.289364 [repo.go:61] Found git repository: github.com/dardevelin/vosk-experiment
+2025/07/18 03:57:26.289437 [repo.go:61] Found git repository: github.com/dardevelin/vosk-experiment/vosk-api
+2025/07/18 03:57:26.302327 [repo.go:61] Found git repository: github.com/jackjackbits/bitchat
+2025/07/18 03:57:26.302878 [repo.go:61] Found git repository: github.com/kuro-technology/fullstack-home-assignment-darcy
+2025/07/18 03:57:26.310899 [repo.go:61] Found git repository: github.com/sharkdp/binocle
+2025/07/18 03:57:26.311112 [repo.go:79] First pass complete, found 22 git repositories
+2025/07/18 03:57:26.311119 [repo.go:82] Second pass: scanning for organizational directories...
+2025/07/18 03:57:26.311161 [repo.go:116] Found organizational directory: bitbucket.com
+2025/07/18 03:57:26.311183 [repo.go:116] Found organizational directory: github.com
+2025/07/18 03:57:26.311222 [repo.go:116] Found organizational directory: github.com/RPi-Distro
+2025/07/18 03:57:26.311250 [repo.go:103] Skipping already visited path: github.com/RPi-Distro/pi-gen
+2025/07/18 03:57:26.311255 [repo.go:116] Found organizational directory: github.com/alphacep
+2025/07/18 03:57:26.311285 [repo.go:103] Skipping already visited path: github.com/alphacep/vosk-api
+2025/07/18 03:57:26.311289 [repo.go:103] Skipping already visited path: github.com/alphacep/vosk-server
+2025/07/18 03:57:26.311293 [repo.go:116] Found organizational directory: github.com/burakorkmez
+2025/07/18 03:57:26.311320 [repo.go:103] Skipping already visited path: github.com/burakorkmez/realtime-spotify-clone
+2025/07/18 03:57:26.311519 [repo.go:116] Found organizational directory: github.com/dardevelin
+2025/07/18 03:57:26.311552 [repo.go:103] Skipping already visited path: github.com/dardevelin/Kekbar
+2025/07/18 03:57:26.311594 [repo.go:103] Skipping already visited path: github.com/dardevelin/gensystray
+2025/07/18 03:57:26.311598 [repo.go:103] Skipping already visited path: github.com/dardevelin/get-repo
+2025/07/18 03:57:26.311602 [repo.go:103] Skipping already visited path: github.com/dardevelin/googletest
+2025/07/18 03:57:26.311624 [repo.go:103] Skipping already visited path: github.com/dardevelin/libmumble
+2025/07/18 03:57:26.311628 [repo.go:103] Skipping already visited path: github.com/dardevelin/mumble
+2025/07/18 03:57:26.311631 [repo.go:103] Skipping already visited path: github.com/dardevelin/pifi
+2025/07/18 03:57:26.311634 [repo.go:103] Skipping already visited path: github.com/dardevelin/tide
+2025/07/18 03:57:26.311638 [repo.go:103] Skipping already visited path: github.com/dardevelin/vosk-experiment
+2025/07/18 03:57:26.311641 [repo.go:116] Found organizational directory: github.com/jackjackbits
+2025/07/18 03:57:26.311671 [repo.go:103] Skipping already visited path: github.com/jackjackbits/bitchat
+2025/07/18 03:57:26.311674 [repo.go:116] Found organizational directory: github.com/kuro-technology
+2025/07/18 03:57:26.311701 [repo.go:103] Skipping already visited path: github.com/kuro-technology/fullstack-home-assignment-darcy
+2025/07/18 03:57:26.311706 [repo.go:116] Found organizational directory: github.com/marc-dantas
+2025/07/18 03:57:26.311727 [repo.go:116] Found organizational directory: github.com/sharkdp
+2025/07/18 03:57:26.311748 [repo.go:103] Skipping already visited path: github.com/sharkdp/binocle
+2025/07/18 03:57:26.311752 [repo.go:116] Found organizational directory: gitlab.com
+2025/07/18 03:57:26.311774 [repo.go:132] Repository scan complete, total found: 33
+2025/07/18 03:57:26.311788 [debug.go:51] EXIT:  Manager.List (took 117.845042ms)
+2025/07/18 03:57:26.311795 [model.go:228] Found 33 repositories
+2025/07/18 03:57:26.311802 [model.go:237] Building repository tree...
+2025/07/18 03:57:26.311841 [model.go:239] Built tree with 3 root nodes
+2025/07/18 03:57:26.311844 [model.go:242] Flattening tree for display...
+2025/07/18 03:57:26.311852 [model.go:244] Created 11 list items
+2025/07/18 03:57:26.312284 [debug.go:51] EXIT:  InitialModel (took 118.419833ms)
+2025/07/18 03:57:26.312292 [main.go:252] UI model created successfully
+2025/07/18 03:57:26.312295 [main.go:254] Creating tea program...
+2025/07/18 03:57:26.312319 [main.go:260] Tea program created, starting...
+2025/07/18 03:57:26.312356 [debug.go:58] ERROR: running tea program - could not open a new TTY: open /dev/tty: device not configured
