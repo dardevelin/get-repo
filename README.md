@@ -1,50 +1,158 @@
 # get-repo
 
-A beautiful, feature-rich TUI for managing your git repositories.
+A beautiful, hierarchical TUI for managing your git repositories with tree-based organization and comprehensive CLI support.
 
-`get-repo` provides a fast and interactive way to browse, clone, update, and manage all your local git repositories from a single, elegant terminal interface.
-
-![get-repo-demo](https://user-images.githubusercontent.com/12345/67890.gif) 
-*<(This is a placeholder GIF. You can create one using tools like `asciinema` and `agg`)>*
+`get-repo` provides an elegant terminal interface to browse, clone, update, and manage all your local git repositories. It organizes repositories by VCS provider (github.com, gitlab.com, etc.) in an expandable tree structure while maintaining full command-line functionality.
 
 ## Features
 
-- **Interactive Repository List:** Browse all your repositories in a filterable, scrollable list.
-- **Effortless Cloning:** Press `c`, paste a URL, and clone it directly into your structured directory.
-- **Quick Updates:** Update any repository with a single keypress (`u`) to pull the latest changes.
-- **Safe Removal:** Remove repositories with a confirmation step (`r`) to prevent accidents.
-- **First-Run Setup:** The app guides you through setting up your codebases directory on the first launch.
-- **Polished UI:** Built with the power of `charmbracelet/bubbletea` for a modern, responsive terminal experience.
+### 🌳 **Hierarchical Tree View**
+- **VCS Organization:** Repositories grouped by provider (github.com, gitlab.com, bitbucket.com)
+- **Expandable Nodes:** Use arrow keys to expand/collapse organizations and users
+- **Expansion State Preservation:** Tree structure remains intact during operations
+- **Visual Status Indicators:** Real-time operation feedback with ⏳, ✅, ❌ icons
+
+### 🚀 **Powerful Operations**
+- **Batch Operations:** Select multiple repositories with space bar for bulk updates/removals
+- **Individual Actions:** Quick single-repository operations
+- **Smart Selection:** Hierarchical selection (select entire VCS provider or user/org)
+- **Safe Removal:** Confirmation prompts prevent accidental deletions
+
+### 🎨 **Beautiful Interface**
+- **Eza-style Colors:** Professional color scheme compatible with common terminal themes
+- **Nerd Font Icons:** Rich iconography for better visual organization
+- **Responsive Design:** Adapts to terminal size changes
+- **File Browser:** Integrated directory selection with visual validation
+
+### 🛠 **Comprehensive CLI**
+- **Interactive & Non-interactive Modes:** Works both as TUI and traditional CLI
+- **Shell Completion:** Full autocompletion support for bash, zsh, and fish
+- **URL Detection:** Smart git URL recognition for direct cloning
+- **Setup Wizard:** Guided first-run configuration with file browser
 
 ## Installation
 
-Installing `get-repo` is simple with Homebrew.
+### Option 1: Download Binary (Recommended)
+Download the latest release from [GitHub Releases](https://github.com/dardevelin/get-repo/releases) and place it in your PATH.
 
-```sh
-# First, tap the formula repository
+### Option 2: Build from Source
+```bash
+git clone https://github.com/dardevelin/get-repo.git
+cd get-repo
+go build -o get-repo ./cmd/get-repo
+sudo mv get-repo /usr/local/bin/
+```
+
+### Option 3: Homebrew (Coming Soon)
+```bash
 brew tap dardevelin/get-repo
-
-# Then, install the application
 brew install get-repo
 ```
 
 ## Usage
 
-Simply run the application from your terminal:
-
-```sh
-get-repo
+### Interactive Mode (TUI)
+Launch the beautiful tree-based interface:
+```bash
+get-repo                    # Launch interactive TUI
+get-repo --interactive      # Force interactive mode
 ```
 
-### Keybindings
+### Command Line Interface
+Use get-repo from the command line for scripting and automation:
+```bash
+# Repository management
+get-repo list                           # List all repositories
+get-repo update                         # Interactive update mode
+get-repo update github.com/user/repo    # Update specific repository
+get-repo remove                         # Interactive removal mode  
+get-repo remove github.com/user/repo    # Remove specific repository
 
-| Key       | Action                                       |
-| :-------- | :------------------------------------------- |
-| `↑`/`↓`   | Navigate the repository list                 |
-| `c`       | Open the clone view to add a new repository  |
-| `u`       | Update the selected repository (`git pull`)    |
-| `r`       | Remove the selected repository (with confirm) |
-| `q` / `esc` | Quit the application                         |
+# Cloning
+get-repo https://github.com/user/repo   # Clone repository
+get-repo git@github.com:user/repo.git   # Clone via SSH
+
+# Help and information
+get-repo --help                         # Show help
+get-repo --version                      # Show version
+```
+
+### Shell Completion
+Enable autocompletion for your shell:
+
+#### Bash
+```bash
+# Install completion
+get-repo completion bash > ~/.bash_completion.d/get-repo
+
+# Or for a single session
+source <(get-repo completion bash)
+```
+
+#### Zsh
+```bash
+# Install completion
+get-repo completion zsh > ~/.oh-my-zsh/completions/_get-repo
+
+# Or add to your .zshrc
+echo 'source <(get-repo completion zsh)' >> ~/.zshrc
+```
+
+#### Fish
+```bash
+# Install completion
+get-repo completion fish > ~/.config/fish/completions/get-repo.fish
+```
+
+## Interactive Mode Keybindings
+
+### Navigation
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` | Navigate up/down |
+| `←`/`h` | Collapse current node |
+| `→`/`l` | Expand current node |
+| `/` | Enable filtering |
+
+### Repository Operations
+| Key | Action |
+|-----|--------|
+| `Space` | Toggle selection (for batch operations) |
+| `a` | Select all repositories |
+| `n` | Deselect all repositories |
+| `c` | Clone new repository |
+| `u` | Update selected repository(s) |
+| `r` | Remove selected repository(s) |
+
+### General
+| Key | Action |
+|-----|--------|
+| `q`/`Esc` | Quit application |
+| `Ctrl+C` | Force quit |
+
+## Configuration
+
+On first run, get-repo will launch a setup wizard to configure:
+- **Configuration location**: Where to store settings
+- **Repository directory**: Where your git repositories are organized  
+- **Shell integration**: Environment variable setup for custom paths
+
+Default structure:
+```
+~/dev/vcs-codebases/
+├── github.com/
+│   ├── user1/
+│   │   ├── repo1/
+│   │   └── repo2/
+│   └── user2/
+│       └── repo3/
+├── gitlab.com/
+│   └── organization/
+│       └── project/
+└── bitbucket.com/
+    └── team/
+        └── repository/
+```
 
 ## License
 
