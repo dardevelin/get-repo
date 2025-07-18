@@ -1,0 +1,709 @@
+package ui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+func (m Model) Init() tea.Cmd {
+	return tea.Batch(textinput.Blink, m.spinner.Tick)
+}
+
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+	
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Forward window size messages to setup wizard when in setup mode
+		if m.state == StateSetup {
+			m.setupWizard, cmd = m.setupWizard.Update(msg)
+			cmds = append(cmds, cmd)
+		} else {
+			// Update list size for other states
+			h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+			width, height := msg.Width-h, msg.Height-v
+			if width < 20 {
+				width = 20
+			}
+			if height < 10 {
+				height = 10
+			}
+			m.list.SetSize(width, height)
+		}
+		
+	case tea.KeyMsg:
+		// Global key handling
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		
+		// Handle state-specific keys
+		switch m.state {
+		case StateList:
+			return m.handleListKeys(msg)
+		case StateClone:
+			return m.handleCloneKeys(msg)
+		case StateRemoveConfirm:
+			return m.handleRemoveConfirmKeys(msg)
+		case StateSetup:
+			return m.handleSetupKeys(msg)
+		case StateUpdateSelection, StateRemoveSelection:
+			return m.handleSelectionKeys(msg)
+		case StateBatchOperation:
+			// No key handling during batch operations
+			return m, nil
+		}
+		
+	case cloneFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.state = StateList
+		} else {
+			m.statusMsg = "Clone completed successfully!"
+			m.state = StateList
+			m.list.Title = "Your Repositories"
+		}
+		
+	case batchOperationMsg:
+		m.operationMutex.Lock()
+		m.completedOps++
+		m.operationResults = append(m.operationResults, OperationResult{
+			RepoName: msg.repoName,
+			Success:  msg.success,
+			Message:  msg.message,
+		})
+		
+		// Update tree node status
+		m.updateNodeStatus(msg.repoName, msg.success, msg.message)
+		
+		// Update progress
+		if m.totalOps > 0 {
+			progress := float64(m.completedOps) / float64(m.totalOps)
+			cmd = m.progress.SetPercent(progress)
+			cmds = append(cmds, cmd)
+		}
+		
+		// Check if all operations are complete
+		if m.completedOps >= m.totalOps {
+			m.state = StateList
+			m.statusMsg = m.generateBatchSummary()
+			m.list.Title = "Your Repositories"
+		}
+		m.operationMutex.Unlock()
+		
+	case refreshListMsg:
+		// Just update the title and state without rebuilding the model
+		m.state = StateList
+		m.list.Title = "Your Repositories"
+		return m, nil
+		
+	case error:
+		m.err = msg
+		return m, nil
+	}
+	
+	// Update sub-components
+	switch m.state {
+	case StateSetup:
+		// Setup wizard handles its own updates
+	case StateClone:
+		m.textInput, cmd = m.textInput.Update(msg)
+		cmds = append(cmds, cmd)
+	case StateCloning, StateUpdate:
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+	case StateUpdateSelection, StateRemoveSelection:
+		m.list, cmd = m.list.Update(msg)
+		cmds = append(cmds, cmd)
+	case StateList:
+		// StateList is handled in handleListKeys, not here
+	case StateBatchOperation:
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+		newProgress, cmd := m.progress.Update(msg)
+		m.progress = newProgress.(progress.Model)
+		cmds = append(cmds, cmd)
+	}
+	
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	
+	switch msg.String() {
+	case "q", "esc":
+		return m, tea.Quit
+	case "c":
+		m.state = StateClone
+		m.textInput = textinput.New()
+		m.textInput.Placeholder = "https://github.com/user/repo"
+		m.textInput.Focus()
+		m.textInput.Width = 50
+		return m, textinput.Blink
+	case "u":
+		if m.list.SelectedItem() == nil {
+			// Go to multi-select mode - preserve current model state
+			m.state = StateUpdateSelection
+			m.list.Title = "Select repositories to update (Space to toggle, Enter to confirm)"
+			return m, nil
+		}
+		// Update single item
+		m.state = StateUpdate
+		repoName := m.list.SelectedItem().(Item).name
+		m.statusMsg = fmt.Sprintf("Updating %s...", repoName)
+		return m, m.updateRepo(repoName)
+	case "r":
+		if m.list.SelectedItem() == nil {
+			// Go to multi-select mode - preserve current model state
+			m.state = StateRemoveSelection
+			m.list.Title = "Select repositories to remove (Space to toggle, Enter to confirm)"
+			return m, nil
+		}
+		// Confirm single removal
+		m.state = StateRemoveConfirm
+		return m, nil
+	case "/":
+		// Enable filtering
+		m.list.SetFilteringEnabled(true)
+		return m, nil
+	case " ":
+		// Toggle selection for batch operations
+		cursor := m.list.Cursor()
+		items := m.list.Items()
+		
+		if cursor < len(items) {
+			// Toggle the selected state
+			item := items[cursor].(Item)
+			item.selected = !item.selected
+			
+			// Update the item in the list
+			newItems := make([]list.Item, len(items))
+			copy(newItems, items)
+			newItems[cursor] = item
+			
+			// Preserve list state when updating items
+			currentWidth, currentHeight := m.list.Width(), m.list.Height()
+			currentCursor := m.list.Cursor()
+			m.list.SetItems(newItems)
+			m.list.SetSize(currentWidth, currentHeight)
+			m.list.Select(currentCursor)
+			
+			// Update status message with current selection count
+			selectedCount := 0
+			for _, listItem := range newItems {
+				if listItem.(Item).selected {
+					selectedCount++
+				}
+			}
+			
+			if selectedCount > 0 {
+				m.statusMsg = fmt.Sprintf("%d items selected (press 'u' to update, 'r' to remove)", selectedCount)
+			} else {
+				m.statusMsg = ""
+			}
+		}
+		return m, nil
+	case "a":
+		// Select all items
+		items := m.list.Items()
+		newItems := make([]list.Item, len(items))
+		for i, listItem := range items {
+			item := listItem.(Item)
+			item.selected = true
+			newItems[i] = item
+		}
+		// Preserve list state when updating items
+		currentWidth, currentHeight := m.list.Width(), m.list.Height()
+		currentCursor := m.list.Cursor()
+		m.list.SetItems(newItems)
+		m.list.SetSize(currentWidth, currentHeight)
+		m.list.Select(currentCursor)
+		m.statusMsg = fmt.Sprintf("All %d items selected", len(items))
+		return m, nil
+	case "n":
+		// Deselect all items
+		items := m.list.Items()
+		newItems := make([]list.Item, len(items))
+		for i, listItem := range items {
+			item := listItem.(Item)
+			item.selected = false
+			newItems[i] = item
+		}
+		// Preserve list state when updating items
+		currentWidth, currentHeight := m.list.Width(), m.list.Height()
+		currentCursor := m.list.Cursor()
+		m.list.SetItems(newItems)
+		m.list.SetSize(currentWidth, currentHeight)
+		m.list.Select(currentCursor)
+		m.statusMsg = ""
+		return m, nil
+	case "right", "l":
+		// Expand current item
+		return m.handleExpandCollapse(true)
+	case "left", "h":
+		// Collapse current item
+		return m.handleExpandCollapse(false)
+	default:
+		// Let the list handle navigation keys (up, down, etc.)
+		m.list, cmd = m.list.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+func (m Model) handleCloneKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		url := m.textInput.Value()
+		if url == "" {
+			m.err = fmt.Errorf("please enter a URL")
+			return m, nil
+		}
+		m.state = StateCloning
+		m.statusMsg = fmt.Sprintf("Cloning %s...", url)
+		return m, m.cloneRepo(url)
+	case "esc":
+		m.state = StateList
+		m.err = nil
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m Model) handleRemoveConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		repoName := m.list.SelectedItem().(Item).name
+		m.state = StateUpdate
+		m.statusMsg = fmt.Sprintf("Removing %s...", repoName)
+		return m, m.removeRepo(repoName)
+	default:
+		m.state = StateList
+		return m, nil
+	}
+}
+
+func (m Model) handleSetupKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	
+	// Update setup wizard
+	m.setupWizard, cmd = m.setupWizard.Update(msg)
+	
+	// Check if setup is complete
+	if m.setupWizard.step == StepComplete {
+		if msg.String() != "" { // Any key press
+			// Apply the setup
+			if err := m.setupWizard.Apply(); err != nil {
+				m.err = fmt.Errorf("setup failed: %w", err)
+				return m, nil
+			}
+			
+			// Reinitialize with list state
+			return InitialModel(StateList), nil
+		}
+	}
+	
+	return m, cmd
+}
+
+func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case " ":
+		// Toggle selection
+		index := m.list.Cursor()
+		if _, ok := m.selected[index]; ok {
+			delete(m.selected, index)
+		} else {
+			m.selected[index] = struct{}{}
+		}
+		return m, nil
+		
+	case "enter":
+		// Process selected items
+		var selectedRepos []string
+		items := m.list.Items()
+		
+		for idx := range m.selected {
+			if idx < len(items) {
+				selectedRepos = append(selectedRepos, items[idx].(Item).name)
+			}
+		}
+		
+		if len(selectedRepos) == 0 {
+			m.state = StateList
+			return m, nil
+		}
+		
+		// Start batch operation
+		m.state = StateBatchOperation
+		m.totalOps = len(selectedRepos)
+		m.completedOps = 0
+		m.operationResults = nil
+		
+		// Set pending status for all selected repositories
+		for _, repoName := range selectedRepos {
+			m.updateNodeStatus(repoName, false, "")
+			m.setNodePending(repoName)
+		}
+		
+		// Create commands for each repo
+		var cmds []tea.Cmd
+		for _, repoName := range selectedRepos {
+			if m.state == StateUpdateSelection {
+				cmds = append(cmds, m.updateRepo(repoName))
+			} else {
+				cmds = append(cmds, m.removeRepo(repoName))
+			}
+		}
+		
+		cmds = append(cmds, m.spinner.Tick)
+		return m, tea.Batch(cmds...)
+		
+	case "esc":
+		m.state = StateList
+		return m, nil
+		
+	case "a":
+		// Select all
+		items := m.list.Items()
+		for i := range items {
+			m.selected[i] = struct{}{}
+		}
+		return m, nil
+		
+	case "n":
+		// Select none
+		m.selected = make(map[int]struct{})
+		return m, nil
+	}
+	
+	return m, nil
+}
+
+func (m Model) generateBatchSummary() string {
+	successCount := 0
+	for _, result := range m.operationResults {
+		if result.Success {
+			successCount++
+		}
+	}
+	
+	failCount := len(m.operationResults) - successCount
+	
+	if failCount == 0 {
+		return fmt.Sprintf("✓ All %d operations completed successfully!", successCount)
+	}
+	
+	return fmt.Sprintf("Completed: %d succeeded, %d failed", successCount, failCount)
+}
+
+func (m Model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf("\n%s\n\nPress any key to continue...", 
+			ErrorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
+	}
+	
+	var s string
+	switch m.state {
+	case StateSetup:
+		s = m.setupWizard.View()
+	case StateClone:
+		s = m.renderClone()
+	case StateCloning, StateUpdate:
+		s = m.renderSpinner()
+	case StateRemoveConfirm:
+		s = m.renderRemoveConfirm()
+	case StateList:
+		s = m.renderList()
+	case StateUpdateSelection, StateRemoveSelection:
+		s = m.renderSelection()
+	case StateBatchOperation:
+		s = m.renderBatchOperation()
+	default:
+		s = "Unknown state"
+	}
+	
+	// Add status message if present
+	if m.statusMsg != "" && m.state == StateList {
+		s += "\n\n" + SuccessStyle.Render(m.statusMsg)
+	}
+	
+	return s
+}
+
+
+func (m Model) renderClone() string {
+	return fmt.Sprintf(
+		"\n%s\n\nEnter the repository URL to clone.\n\n%s\n\n%s",
+		TitleStyle.Render("Clone Repository"),
+		m.textInput.View(),
+		HelpStyle.Render("Enter to clone • Esc to cancel"),
+	)
+}
+
+func (m Model) renderSpinner() string {
+	return fmt.Sprintf("\n\n   %s %s\n\n", m.spinner.View(), m.statusMsg)
+}
+
+func (m Model) renderRemoveConfirm() string {
+	selected := m.list.SelectedItem().(Item).name
+	return fmt.Sprintf(
+		"\n\n   %s\n   This action cannot be undone.\n\n   [y/N]\n\n",
+		fmt.Sprintf("Are you sure you want to remove %s?", TitleStyle.Render(selected)),
+	)
+}
+
+func (m Model) renderList() string {
+	content := lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
+	help := m.getListHelp()
+	return content + "\n" + help
+}
+
+func (m Model) renderSelection() string {
+	// Custom render for selection mode
+	var lines []string
+	items := m.list.Items()
+	cursor := m.list.Cursor()
+	
+	// Add title
+	lines = append(lines, TitleStyle.Render(m.list.Title))
+	lines = append(lines, "")
+	
+	// Render items with checkboxes
+	start := 0
+	if cursor > 10 {
+		start = cursor - 10
+	}
+	end := start + 20
+	if end > len(items) {
+		end = len(items)
+	}
+	
+	for i := start; i < end; i++ {
+		checkbox := "[ ]"
+		if _, selected := m.selected[i]; selected {
+			checkbox = "[x]"
+		}
+		
+		line := fmt.Sprintf("%s %s", checkbox, items[i].(Item).name)
+		
+		if i == cursor {
+			line = SelectedItemStyle.Render("→ " + line)
+		} else {
+			line = "  " + line
+		}
+		
+		lines = append(lines, line)
+	}
+	
+	content := lipgloss.NewStyle().Margin(1, 2).Render(strings.Join(lines, "\n"))
+	help := m.getSelectionHelp()
+	
+	return content + "\n\n" + help
+}
+
+func (m Model) renderBatchOperation() string {
+	progressBar := m.progress.View()
+	status := fmt.Sprintf("Processing %d/%d repositories...", m.completedOps, m.totalOps)
+	
+	var details []string
+	for _, result := range m.operationResults {
+		if result.Success {
+			details = append(details, SuccessStyle.Render(fmt.Sprintf("✓ %s", result.RepoName)))
+		} else {
+			details = append(details, ErrorStyle.Render(fmt.Sprintf("✗ %s: %s", result.RepoName, result.Message)))
+		}
+	}
+	
+	content := fmt.Sprintf(
+		"\n%s\n\n%s\n\n%s %s\n\n%s",
+		TitleStyle.Render("Batch Operation"),
+		progressBar,
+		m.spinner.View(),
+		status,
+		strings.Join(details, "\n"),
+	)
+	
+	return content
+}
+
+func (m Model) getListHelp() string {
+	return HelpStyle.Render("↑/↓ navigate • ←/→ collapse/expand • Space select • a all • n none • c clone • u update • r remove • q quit")
+}
+
+func (m Model) getSelectionHelp() string {
+	selectedCount := len(m.selected)
+	status := fmt.Sprintf("%d selected", selectedCount)
+	return HelpStyle.Render(fmt.Sprintf("%s • Space toggle • a all • n none • Enter confirm • Esc cancel", status))
+}
+
+// handleExpandCollapse handles expanding and collapsing tree nodes
+func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
+	cursor := m.list.Cursor()
+	items := m.list.Items()
+	
+	if cursor >= len(items) {
+		return m, nil
+	}
+	
+	item := items[cursor].(Item)
+	
+	// Only expandable items can be expanded/collapsed
+	if !item.isExpandable {
+		return m, nil
+	}
+	
+	// Update the node's expanded state
+	if expand && !item.node.IsExpanded {
+		item.node.IsExpanded = true
+	} else if !expand && item.node.IsExpanded {
+		item.node.IsExpanded = false
+	} else {
+		// No change needed
+		return m, nil
+	}
+	
+	// Rebuild the tree from the root nodes
+	// First, find root nodes by traversing up from current item
+	var rootNodes []*TreeNode
+	currentNode := item.node
+	for currentNode.Parent != nil {
+		currentNode = currentNode.Parent
+	}
+	
+	// Collect all root nodes (this is a bit hacky, but works for now)
+	// In a better implementation, we'd store root nodes in the model
+	allItems := m.list.Items()
+	rootMap := make(map[string]*TreeNode)
+	
+	for _, listItem := range allItems {
+		node := listItem.(Item).node
+		root := node
+		for root.Parent != nil {
+			root = root.Parent
+		}
+		rootMap[root.Name] = root
+	}
+	
+	for _, root := range rootMap {
+		rootNodes = append(rootNodes, root)
+	}
+	
+	// Flatten tree and update list
+	newItems := flattenTree(rootNodes)
+	
+	// Preserve list state
+	currentWidth, currentHeight := m.list.Width(), m.list.Height()
+	m.list.SetItems(newItems)
+	m.list.SetSize(currentWidth, currentHeight)
+	
+	// Try to keep cursor on the same item (by name)
+	for i, newItem := range newItems {
+		if newItem.(Item).name == item.name && newItem.(Item).level == item.level {
+			m.list.Select(i)
+			break
+		}
+	}
+	
+	return m, nil
+}
+
+// updateNodeStatus updates the status of a tree node based on operation result
+func (m *Model) updateNodeStatus(repoName string, success bool, message string) {
+	items := m.list.Items()
+	
+	// Find and update the specific node without rebuilding the tree
+	for _, listItem := range items {
+		item := listItem.(Item)
+		
+		// Check if this item matches the repository
+		if item.isGitRepo && item.node.Path == repoName {
+			// Update status directly on the node (this will be reflected in the display)
+			if success {
+				item.node.Status = StatusSuccess
+			} else {
+				item.node.Status = StatusFailed
+			}
+			item.node.StatusMsg = message
+			break // Found the item, no need to continue
+		}
+	}
+	
+	// Rebuild the display from the tree (preserving expansion states)
+	m.refreshTreeDisplay()
+}
+
+// setNodePending sets a repository node to pending status
+func (m *Model) setNodePending(repoName string) {
+	items := m.list.Items()
+	
+	// Find and update the specific node without rebuilding the tree
+	for _, listItem := range items {
+		item := listItem.(Item)
+		
+		// Check if this item matches the repository
+		if item.isGitRepo && item.node.Path == repoName {
+			item.node.Status = StatusPending
+			item.node.StatusMsg = "Operation in progress..."
+			break // Found the item, no need to continue
+		}
+	}
+	
+	// Rebuild the display from the tree (preserving expansion states)
+	m.refreshTreeDisplay()
+}
+
+// refreshTreeDisplay rebuilds the flat list from tree nodes while preserving expansion states
+func (m *Model) refreshTreeDisplay() {
+	items := m.list.Items()
+	
+	// Collect all root nodes from current items
+	rootMap := make(map[string]*TreeNode)
+	
+	for _, listItem := range items {
+		item := listItem.(Item)
+		if item.node != nil {
+			// Find the root of this node
+			root := item.node
+			for root.Parent != nil {
+				root = root.Parent
+			}
+			rootMap[root.Name] = root
+		}
+	}
+	
+	// Convert map to slice
+	var rootNodes []*TreeNode
+	for _, root := range rootMap {
+		rootNodes = append(rootNodes, root)
+	}
+	
+	// Flatten tree with current expansion states preserved
+	newItems := flattenTree(rootNodes)
+	
+	// Preserve list state
+	currentWidth, currentHeight := m.list.Width(), m.list.Height()
+	currentCursor := m.list.Cursor()
+	
+	// Update the list with new items
+	m.list.SetItems(newItems)
+	m.list.SetSize(currentWidth, currentHeight)
+	
+	// Try to maintain cursor position if possible
+	if currentCursor < len(newItems) {
+		m.list.Select(currentCursor)
+	} else if len(newItems) > 0 {
+		m.list.Select(0)
+	}
+	
+	// Force a refresh to ensure the new status indicators are rendered
+	m.list.SetItems(m.list.Items()) // This forces the list to re-render
+}
