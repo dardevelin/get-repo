@@ -19,7 +19,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		// Forward window size messages to setup wizard when in setup mode
@@ -32,15 +32,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 			width := msg.Width - h
 			height := msg.Height - v
-			
+
 			// Reserve space for UI elements:
-			// - 1 line for help text  
+			// - 1 line for help text
 			// - 3 lines for status message area (includes spacing)
 			// - 2 extra lines for safety (progress, errors)
 			// This prevents UI shifting when status appears
 			reservedHeight := 6
 			height = height - reservedHeight
-			
+
 			if width < 20 {
 				width = 20
 			}
@@ -51,14 +51,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Ensure title is shown after resize
 			m.list.SetShowTitle(true)
 		}
-		
+
 	case tea.KeyMsg:
 		// Global key handling
 		debug.Log("Key pressed: %s in state %v", msg.String(), m.state)
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		
+
 		// Handle state-specific keys
 		switch m.state {
 		case StateList:
@@ -75,7 +75,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// No key handling during batch operations
 			return m, nil
 		}
-		
+
 	case cloneFinishedMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -85,7 +85,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refreshRepositoryList()
 		}
 		m.state = StateList
-		
+
 	case batchOperationMsg:
 		m.operationMutex.Lock()
 		m.completedOps++
@@ -94,21 +94,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Success:  msg.success,
 			Message:  msg.message,
 		})
-		
+
 		// Update tree node status
 		m.updateNodeStatus(msg.repoName, msg.success, msg.message)
-		
+
 		// Update progress
 		if m.totalOps > 0 {
 			progress := float64(m.completedOps) / float64(m.totalOps)
 			cmd = m.progress.SetPercent(progress)
 			cmds = append(cmds, cmd)
 		}
-		
+
 		// Check if all operations are complete
 		if m.completedOps >= m.totalOps {
 			m.statusMsg = m.generateBatchSummary()
-			
+
 			// Clear all selections after batch operation
 			items := m.list.Items()
 			newItems := make([]list.Item, len(items))
@@ -125,36 +125,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.Select(currentCursor)
 		}
 		m.operationMutex.Unlock()
-		
+
 	case refreshListMsg:
 		// Just update the title and state without rebuilding the model
 		m.state = StateList
 		m.list.Title = "Your Repositories"
 		return m, nil
-		
+
 	case repositoryListMsg:
 		// Update the list with new items
 		currentWidth, currentHeight := m.list.Width(), m.list.Height()
 		currentCursor := m.list.Cursor()
-		
+
 		m.list.SetItems(msg.items)
 		m.list.SetSize(currentWidth, currentHeight)
 		m.list.Title = "Your Repositories"
-		
+
 		// Try to maintain cursor position if possible
 		if currentCursor < len(msg.items) {
 			m.list.Select(currentCursor)
 		} else if len(msg.items) > 0 {
 			m.list.Select(0)
 		}
-		
+
 		return m, nil
-		
+
 	case error:
 		m.err = msg
 		return m, nil
 	}
-	
+
 	// Update sub-components
 	switch m.state {
 	case StateSetup:
@@ -183,13 +183,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.progress = newProgress.(progress.Model)
 		cmds = append(cmds, cmd)
 	}
-	
+
 	return m, tea.Batch(cmds...)
 }
 
 func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	
+
 	switch msg.String() {
 	case "q", "esc":
 		return m, tea.Quit
@@ -205,7 +205,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.list.Items()
 		hasSelections := false
 		selectedRepos := []string{}
-		
+
 		for _, listItem := range items {
 			item := listItem.(Item)
 			if item.selected && item.isGitRepo {
@@ -213,7 +213,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				selectedRepos = append(selectedRepos, item.node.Path)
 			}
 		}
-		
+
 		// If we have pre-selected items, process them immediately
 		if hasSelections {
 			// Stay in list state but track operations
@@ -221,22 +221,22 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.completedOps = 0
 			m.operationResults = nil // Clear previous results
 			// Process batch update
-			
+
 			// Set pending status for all selected repositories
 			for _, repoPath := range selectedRepos {
 				m.setNodePending(repoPath)
 			}
-			
+
 			// Create commands for each repo
 			var cmds []tea.Cmd
 			for _, repoPath := range selectedRepos {
 				cmds = append(cmds, m.updateRepo(repoPath))
 			}
-			
+
 			cmds = append(cmds, m.spinner.Tick)
 			return m, tea.Batch(cmds...)
 		}
-		
+
 		// If no selections and no item under cursor, go to selection mode
 		if m.list.SelectedItem() == nil {
 			m.state = StateUpdateSelection
@@ -246,16 +246,16 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		selectedItem := m.list.SelectedItem().(Item)
 		// Use the full path from the node for git repos
 		repoPath := selectedItem.node.Path
-		
+
 		// Set pending status immediately so user sees feedback
 		m.setNodePending(repoPath)
-		
+
 		// Initialize batch operation tracking for single operation
 		m.totalOps = 1
 		m.completedOps = 0
-		m.operationResults = nil // Clear previous results
+		m.operationResults = nil           // Clear previous results
 		m.list.Title = "Your Repositories" // Ensure title is set
-		
+
 		// Stay in list state
 		m.statusMsg = fmt.Sprintf("Updating %s...", selectedItem.name)
 		return m, tea.Batch(
@@ -267,7 +267,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		items := m.list.Items()
 		hasSelections := false
 		selectedRepos := []string{}
-		
+
 		for _, listItem := range items {
 			item := listItem.(Item)
 			if item.selected && item.isGitRepo {
@@ -275,20 +275,20 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				selectedRepos = append(selectedRepos, item.node.Path)
 			}
 		}
-		
+
 		// If we have pre-selected items, confirm removal
 		if hasSelections {
 			m.state = StateRemoveConfirm
 			m.batchRemoveRepos = selectedRepos
 			return m, nil
 		}
-		
+
 		// If no selections and no item under cursor, go to selection mode
 		if m.list.SelectedItem() == nil {
 			m.state = StateRemoveSelection
 			return m, nil
 		}
-		
+
 		// Confirm single removal
 		m.state = StateRemoveConfirm
 		return m, nil
@@ -300,17 +300,17 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Toggle selection for batch operations
 		cursor := m.list.Cursor()
 		items := m.list.Items()
-		
+
 		if cursor < len(items) {
 			// Toggle the selected state
 			item := items[cursor].(Item)
 			item.selected = !item.selected
-			
+
 			// Update the item in the list
 			newItems := make([]list.Item, len(items))
 			copy(newItems, items)
 			newItems[cursor] = item
-			
+
 			// Preserve list state when updating items
 			currentWidth, currentHeight := m.list.Width(), m.list.Height()
 			currentCursor := m.list.Cursor()
@@ -318,7 +318,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.list.SetItems(newItems)
 			m.list.SetSize(currentWidth, currentHeight)
 			m.list.Select(currentCursor)
-			
+
 			// Update status message with current selection count
 			selectedCount := 0
 			for _, listItem := range newItems {
@@ -326,7 +326,7 @@ func (m Model) handleListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					selectedCount++
 				}
 			}
-			
+
 			if selectedCount > 0 {
 				m.statusMsg = fmt.Sprintf("%d items selected (press 'u' to update, 'r' to remove)", selectedCount)
 			} else {
@@ -415,25 +415,25 @@ func (m Model) handleRemoveConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.totalOps = len(m.batchRemoveRepos)
 			m.completedOps = 0
 			m.operationResults = nil
-			
+
 			// Set pending status for all selected repositories
 			for _, repoPath := range m.batchRemoveRepos {
 				m.setNodePending(repoPath)
 			}
-			
+
 			// Create commands for each repo
 			var cmds []tea.Cmd
 			for _, repoPath := range m.batchRemoveRepos {
 				cmds = append(cmds, m.removeRepo(repoPath))
 			}
-			
+
 			// Clear batch list after starting operation
 			m.batchRemoveRepos = nil
-			
+
 			cmds = append(cmds, m.spinner.Tick)
 			return m, tea.Batch(cmds...)
 		}
-		
+
 		// Single removal
 		selectedItem := m.list.SelectedItem().(Item)
 		repoPath := selectedItem.node.Path
@@ -449,10 +449,10 @@ func (m Model) handleRemoveConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleSetupKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	
+
 	// Update setup wizard
 	m.setupWizard, cmd = m.setupWizard.Update(msg)
-	
+
 	// Check if setup is complete
 	if m.setupWizard.step == StepComplete {
 		if msg.String() != "" { // Any key press
@@ -461,12 +461,12 @@ func (m Model) handleSetupKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.err = fmt.Errorf("setup failed: %w", err)
 				return m, nil
 			}
-			
+
 			// Reinitialize with list state
 			return InitialModel(StateList), nil
 		}
 	}
-	
+
 	return m, cmd
 }
 
@@ -481,12 +481,12 @@ func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selected[index] = struct{}{}
 		}
 		return m, nil
-		
+
 	case "enter":
 		// Process selected items
 		var selectedRepos []string
 		items := m.list.Items()
-		
+
 		for idx := range m.selected {
 			if idx < len(items) {
 				item := items[idx].(Item)
@@ -494,23 +494,23 @@ func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				selectedRepos = append(selectedRepos, item.node.Path)
 			}
 		}
-		
+
 		if len(selectedRepos) == 0 {
 			m.state = StateList
 			return m, nil
 		}
-		
+
 		// Stay in list state but track operations
 		m.state = StateList
 		m.totalOps = len(selectedRepos)
 		m.completedOps = 0
 		m.operationResults = nil
-		
+
 		// Set pending status for all selected repositories
 		for _, repoName := range selectedRepos {
 			m.setNodePending(repoName)
 		}
-		
+
 		// Create commands for each repo
 		var cmds []tea.Cmd
 		for _, repoName := range selectedRepos {
@@ -520,14 +520,14 @@ func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, m.removeRepo(repoName))
 			}
 		}
-		
+
 		cmds = append(cmds, m.spinner.Tick)
 		return m, tea.Batch(cmds...)
-		
+
 	case "esc":
 		m.state = StateList
 		return m, nil
-		
+
 	case "a":
 		// Select all
 		items := m.list.Items()
@@ -535,13 +535,13 @@ func (m Model) handleSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selected[i] = struct{}{}
 		}
 		return m, nil
-		
+
 	case "n":
 		// Select none
 		m.selected = make(map[int]struct{})
 		return m, nil
 	}
-	
+
 	return m, nil
 }
 
@@ -552,22 +552,22 @@ func (m Model) generateBatchSummary() string {
 			successCount++
 		}
 	}
-	
+
 	failCount := len(m.operationResults) - successCount
-	
+
 	if failCount == 0 {
 		return fmt.Sprintf("✓ All %d operations completed successfully!", successCount)
 	}
-	
+
 	return fmt.Sprintf("Completed: %d succeeded, %d failed", successCount, failCount)
 }
 
 func (m Model) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("\n%s\n\nPress any key to continue...", 
+		return fmt.Sprintf("\n%s\n\nPress any key to continue...",
 			ErrorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
 	}
-	
+
 	var s string
 	switch m.state {
 	case StateSetup:
@@ -587,12 +587,11 @@ func (m Model) View() string {
 	default:
 		s = "Unknown state"
 	}
-	
+
 	// Status message is now handled in renderList to prevent shifting
-	
+
 	return s
 }
-
 
 func (m Model) renderClone() string {
 	return fmt.Sprintf(
@@ -615,7 +614,7 @@ func (m Model) renderRemoveConfirm() string {
 			fmt.Sprintf("Are you sure you want to remove %d repositories?", len(m.batchRemoveRepos)),
 		)
 	}
-	
+
 	// Single removal
 	selected := m.list.SelectedItem().(Item).name
 	return fmt.Sprintf(
@@ -628,15 +627,15 @@ func (m Model) renderList() string {
 	// Get the list view
 	content := lipgloss.NewStyle().Margin(1, 2).Render(m.list.View())
 	help := m.getListHelp()
-	
+
 	var bottomSection string
-	
+
 	// Show operation progress if running
 	if m.totalOps > 0 && m.completedOps < m.totalOps {
 		progress := fmt.Sprintf("\n\nOperations: %d/%d completed", m.completedOps, m.totalOps)
 		bottomSection = PendingStyle.Render(progress)
 	}
-	
+
 	// Show any recent operation results at the bottom
 	if len(m.operationResults) > 0 && m.state == StateList {
 		var recentErrors []string
@@ -649,16 +648,16 @@ func (m Model) renderList() string {
 				recentErrors = append(recentErrors, fmt.Sprintf("  ✗ %s: %s", result.RepoName, errorMsg))
 			}
 		}
-		
+
 		if len(recentErrors) > 0 {
 			if bottomSection != "" {
 				bottomSection += "\n"
 			}
-			bottomSection += "\n" + ErrorStyle.Render("Recent Errors:") + "\n" + 
+			bottomSection += "\n" + ErrorStyle.Render("Recent Errors:") + "\n" +
 				ErrorStyle.Render(strings.Join(recentErrors, "\n"))
 		}
 	}
-	
+
 	// Always include status area to prevent UI shifting
 	statusArea := ""
 	if m.statusMsg != "" {
@@ -667,7 +666,7 @@ func (m Model) renderList() string {
 		// Reserve space even when no status
 		statusArea = "\n\n "
 	}
-	
+
 	return content + "\n" + help + bottomSection + statusArea
 }
 
@@ -676,7 +675,7 @@ func (m Model) renderSelection() string {
 	var lines []string
 	items := m.list.Items()
 	cursor := m.list.Cursor()
-	
+
 	// Add title based on state
 	title := "Your Repositories"
 	if m.state == StateUpdateSelection {
@@ -686,7 +685,7 @@ func (m Model) renderSelection() string {
 	}
 	lines = append(lines, TitleStyle.Render(title))
 	lines = append(lines, "")
-	
+
 	// Render items with selection indicators
 	start := 0
 	if cursor > 10 {
@@ -696,11 +695,11 @@ func (m Model) renderSelection() string {
 	if end > len(items) {
 		end = len(items)
 	}
-	
+
 	for i := start; i < end; i++ {
 		item := items[i].(Item)
 		_, isSelected := m.selected[i]
-		
+
 		var line string
 		if i == cursor {
 			// Current cursor position
@@ -721,29 +720,29 @@ func (m Model) renderSelection() string {
 				line = "    " + item.name
 			}
 		}
-		
+
 		lines = append(lines, line)
 	}
-	
+
 	content := lipgloss.NewStyle().Margin(1, 2).Render(strings.Join(lines, "\n"))
 	help := m.getSelectionHelp()
-	
+
 	return content + "\n\n" + help
 }
 
 func (m Model) renderBatchOperation() string {
 	// Header section
 	header := TitleStyle.Render("Batch Operation")
-	
+
 	// Progress section
 	progressBar := m.progress.View()
 	status := fmt.Sprintf("%s Processing %d/%d repositories...", m.spinner.View(), m.completedOps, m.totalOps)
-	
+
 	// Split results into succeeded and failed for better organization
 	var succeeded []string
 	var failed []string
 	var pending []string
-	
+
 	// Track which repos have been processed
 	processedRepos := make(map[string]bool)
 	for _, result := range m.operationResults {
@@ -760,7 +759,7 @@ func (m Model) renderBatchOperation() string {
 			failed = append(failed, fmt.Sprintf("    └─ %s", errorMsg))
 		}
 	}
-	
+
 	// Show pending operations
 	items := m.list.Items()
 	for _, item := range items {
@@ -770,7 +769,7 @@ func (m Model) renderBatchOperation() string {
 			}
 		}
 	}
-	
+
 	// Build content sections
 	var sections []string
 	sections = append(sections, header)
@@ -779,25 +778,25 @@ func (m Model) renderBatchOperation() string {
 	sections = append(sections, "")
 	sections = append(sections, status)
 	sections = append(sections, "")
-	
+
 	// Add sections based on what we have
 	if len(pending) > 0 {
 		sections = append(sections, PendingStyle.Render("Pending:"))
 		sections = append(sections, strings.Join(pending, "\n"))
 		sections = append(sections, "")
 	}
-	
+
 	if len(succeeded) > 0 {
 		sections = append(sections, SuccessStyle.Render("Succeeded:"))
 		sections = append(sections, SuccessStyle.Render(strings.Join(succeeded, "\n")))
 		sections = append(sections, "")
 	}
-	
+
 	if len(failed) > 0 {
 		sections = append(sections, ErrorStyle.Render("Failed:"))
 		sections = append(sections, ErrorStyle.Render(strings.Join(failed, "\n")))
 	}
-	
+
 	return "\n" + strings.Join(sections, "\n")
 }
 
@@ -815,18 +814,18 @@ func (m Model) getSelectionHelp() string {
 func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
 	cursor := m.list.Cursor()
 	items := m.list.Items()
-	
+
 	if cursor >= len(items) {
 		return m, nil
 	}
-	
+
 	item := items[cursor].(Item)
-	
+
 	// Only expandable items can be expanded/collapsed
 	if !item.isExpandable {
 		return m, nil
 	}
-	
+
 	// Update the node's expanded state
 	if expand && !item.node.IsExpanded {
 		item.node.IsExpanded = true
@@ -836,7 +835,7 @@ func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
 		// No change needed
 		return m, nil
 	}
-	
+
 	// Rebuild the tree from the root nodes
 	// First, find root nodes by traversing up from current item
 	var rootNodes []*TreeNode
@@ -844,12 +843,12 @@ func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
 	for currentNode.Parent != nil {
 		currentNode = currentNode.Parent
 	}
-	
+
 	// Collect all root nodes (this is a bit hacky, but works for now)
 	// In a better implementation, we'd store root nodes in the model
 	allItems := m.list.Items()
 	rootMap := make(map[string]*TreeNode)
-	
+
 	for _, listItem := range allItems {
 		node := listItem.(Item).node
 		root := node
@@ -858,21 +857,21 @@ func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
 		}
 		rootMap[root.Name] = root
 	}
-	
+
 	for _, root := range rootMap {
 		rootNodes = append(rootNodes, root)
 	}
-	
+
 	// Flatten tree and update list
 	newItems := flattenTree(rootNodes)
-	
+
 	// Preserve list state
 	currentWidth, currentHeight := m.list.Width(), m.list.Height()
 	currentTitle := m.list.Title
 	m.list.SetItems(newItems)
 	m.list.SetSize(currentWidth, currentHeight)
 	m.list.Title = currentTitle // Preserve title
-	
+
 	// Try to keep cursor on the same item (by name)
 	for i, newItem := range newItems {
 		if newItem.(Item).name == item.name && newItem.(Item).level == item.level {
@@ -880,18 +879,18 @@ func (m Model) handleExpandCollapse(expand bool) (Model, tea.Cmd) {
 			break
 		}
 	}
-	
+
 	return m, nil
 }
 
 // updateNodeStatus updates the status of a tree node based on operation result
 func (m *Model) updateNodeStatus(repoName string, success bool, message string) {
 	items := m.list.Items()
-	
+
 	// Find and update the specific node without rebuilding the tree
 	for _, listItem := range items {
 		item := listItem.(Item)
-		
+
 		// Check if this item matches the repository
 		if item.isGitRepo && item.node.Path == repoName {
 			// Update status directly on the node (this will be reflected in the display)
@@ -904,7 +903,7 @@ func (m *Model) updateNodeStatus(repoName string, success bool, message string) 
 			break // Found the item, no need to continue
 		}
 	}
-	
+
 	// Rebuild the display from the tree (preserving expansion states)
 	m.refreshTreeDisplay()
 }
@@ -912,11 +911,11 @@ func (m *Model) updateNodeStatus(repoName string, success bool, message string) 
 // setNodePending sets a repository node to pending status
 func (m *Model) setNodePending(repoName string) {
 	items := m.list.Items()
-	
+
 	// Find and update the specific node without rebuilding the tree
 	for _, listItem := range items {
 		item := listItem.(Item)
-		
+
 		// Check if this item matches the repository
 		if item.isGitRepo && item.node.Path == repoName {
 			item.node.Status = StatusPending
@@ -924,7 +923,7 @@ func (m *Model) setNodePending(repoName string) {
 			break // Found the item, no need to continue
 		}
 	}
-	
+
 	// Rebuild the display from the tree (preserving expansion states)
 	m.refreshTreeDisplay()
 }
@@ -932,10 +931,10 @@ func (m *Model) setNodePending(repoName string) {
 // refreshTreeDisplay rebuilds the flat list from tree nodes while preserving expansion states
 func (m *Model) refreshTreeDisplay() {
 	items := m.list.Items()
-	
+
 	// Collect all root nodes from current items
 	rootMap := make(map[string]*TreeNode)
-	
+
 	for _, listItem := range items {
 		item := listItem.(Item)
 		if item.node != nil {
@@ -947,31 +946,31 @@ func (m *Model) refreshTreeDisplay() {
 			rootMap[root.Name] = root
 		}
 	}
-	
+
 	// Convert map to slice
 	var rootNodes []*TreeNode
 	for _, root := range rootMap {
 		rootNodes = append(rootNodes, root)
 	}
-	
+
 	// Flatten tree with current expansion states preserved
 	newItems := flattenTree(rootNodes)
-	
+
 	// Preserve list state
 	currentWidth, currentHeight := m.list.Width(), m.list.Height()
 	currentCursor := m.list.Cursor()
-	
+
 	// Update the list with new items
 	m.list.SetItems(newItems)
 	m.list.SetSize(currentWidth, currentHeight)
-	
+
 	// Try to maintain cursor position if possible
 	if currentCursor < len(newItems) {
 		m.list.Select(currentCursor)
 	} else if len(newItems) > 0 {
 		m.list.Select(0)
 	}
-	
+
 	// Force a refresh to ensure the new status indicators are rendered
 	m.list.SetItems(m.list.Items()) // This forces the list to re-render
 }
@@ -984,13 +983,13 @@ func (m Model) refreshRepositoryList() tea.Cmd {
 		if err != nil {
 			return error(fmt.Errorf("failed to scan repositories: %w", err))
 		}
-		
+
 		// Build tree structure from repositories
 		tree := buildRepositoryTree(repos)
-		
+
 		// Convert tree to flat list for display
 		items := flattenTree(tree)
-		
+
 		return repositoryListMsg{items: items}
 	}
 }

@@ -24,10 +24,10 @@ type FileBrowser struct {
 
 // FileItem represents a file or directory in the browser
 type FileItem struct {
-	name      string
-	path      string
-	isDir     bool
-	isHidden  bool
+	name     string
+	path     string
+	isDir    bool
+	isHidden bool
 }
 
 func (f FileItem) Title() string {
@@ -38,16 +38,16 @@ func (f FileItem) Title() string {
 			Bold(true).
 			Render("󰄬  Select this directory")
 	}
-	
+
 	if f.name == ".." {
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#808080")). // Muted gray
 			Render("  .. (parent directory)")
 	}
-	
+
 	// Get icon and color for the item
 	icon, color := getFileIconAndColor(f.name, f.isDir)
-	
+
 	// Apply styling based on file state
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
 	if f.isDir && !f.isHidden {
@@ -58,7 +58,7 @@ func (f FileItem) Title() string {
 			Foreground(lipgloss.Color("#808080")). // Muted gray for hidden files
 			Italic(true)
 	}
-	
+
 	styledName := style.Render(f.name)
 	return fmt.Sprintf("%s  %s", icon, styledName)
 }
@@ -74,9 +74,9 @@ func getFileIconAndColor(filename string, isDir bool) (string, string) {
 		// Directory icon and color - real eza style (blue from screenshot)
 		return "", "#569cd6" // Blue for directories like in eza
 	}
-	
+
 	ext := strings.ToLower(filepath.Ext(filename))
-	
+
 	switch ext {
 	case ".go":
 		return "", "#569cd6" // Go files - blue like in eza
@@ -152,63 +152,63 @@ func NewFileBrowser(startPath string, directoryOnly bool) FileBrowser {
 	if startPath == "" {
 		startPath = os.Getenv("HOME")
 	}
-	
+
 	// Ensure the path exists and is absolute
 	absPath, err := filepath.Abs(startPath)
 	if err != nil || !pathExists(absPath) {
 		absPath = os.Getenv("HOME")
 	}
-	
+
 	fb := FileBrowser{
 		currentPath:   absPath,
 		showHidden:    false,
 		directoryOnly: directoryOnly,
 		terminalWidth: 80, // Default fallback
 	}
-	
+
 	fb.refreshItems()
-	
+
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = false // No descriptions for cleaner look
-	delegate.SetHeight(1) // Single line items
+	delegate.SetHeight(1)            // Single line items
 	delegate.SetSpacing(0)
-	
+
 	// Simple, clean selection style
 	delegate.Styles.SelectedTitle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#ffffff")). // White text
 		Background(lipgloss.Color("#264f78")). // Darker blue background
 		Padding(0, 1)
-	
+
 	// Remove all other styling for minimal look
 	delegate.Styles.NormalTitle = lipgloss.NewStyle()
 	delegate.Styles.DimmedTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
 	delegate.Styles.FilterMatch = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ec9b0"))
-	
+
 	fb.list = list.New(fb.items, delegate, 80, 20) // Start with reasonable size
-	fb.list.Title = "" // No title, we'll handle it in the view
+	fb.list.Title = ""                             // No title, we'll handle it in the view
 	fb.list.SetShowHelp(false)
 	fb.list.SetShowStatusBar(false) // Hide status bar
-	fb.list.SetShowTitle(false) // Don't show the title in the list
+	fb.list.SetShowTitle(false)     // Don't show the title in the list
 	fb.list.SetFilteringEnabled(true)
 	fb.list.DisableQuitKeybindings()
-	
+
 	return fb
 }
 
 // Update handles file browser updates
 func (fb FileBrowser) Update(msg tea.Msg) (FileBrowser, tea.Cmd) {
 	var cmd tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		// Store terminal width for status bar calculations
 		fb.terminalWidth = msg.Width
-		
+
 		// Calculate available space more precisely
 		// Account for: border (2+2), padding (1+1), status bar (1), help text (1), margins (2)
-		availableWidth := msg.Width - 8  // Border + padding + margins
+		availableWidth := msg.Width - 8    // Border + padding + margins
 		availableHeight := msg.Height - 10 // Status bar + help text + border + padding + margins
-		
+
 		// Ensure minimum usable dimensions
 		if availableWidth < 40 {
 			availableWidth = 40
@@ -216,11 +216,11 @@ func (fb FileBrowser) Update(msg tea.Msg) (FileBrowser, tea.Cmd) {
 		if availableHeight < 6 {
 			availableHeight = 6
 		}
-		
+
 		fb.list.SetSize(availableWidth, availableHeight)
-		
+
 		return fb, nil
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
@@ -248,14 +248,14 @@ func (fb FileBrowser) Update(msg tea.Msg) (FileBrowser, tea.Cmd) {
 					}
 				}
 			}
-			
+
 		case "h", "ctrl+h":
 			// Toggle hidden files
 			fb.showHidden = !fb.showHidden
 			fb.refreshItems()
 			fb.list.SetItems(fb.items)
 			return fb, nil
-			
+
 		case "ctrl+l":
 			// Refresh current directory
 			fb.refreshItems()
@@ -263,7 +263,7 @@ func (fb FileBrowser) Update(msg tea.Msg) (FileBrowser, tea.Cmd) {
 			return fb, nil
 		}
 	}
-	
+
 	fb.list, cmd = fb.list.Update(msg)
 	return fb, cmd
 }
@@ -276,10 +276,10 @@ func (fb FileBrowser) View() string {
 		Bold(true).
 		MarginBottom(1).
 		Render(fmt.Sprintf("📁 %s", fb.currentPath))
-	
+
 	// Clean list without borders or extra styling
 	listView := fb.list.View()
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, header, listView)
 }
 
@@ -291,19 +291,18 @@ func (fb FileBrowser) ViewWithHelp() string {
 		Bold(true).
 		MarginBottom(1).
 		Render(fmt.Sprintf("📁 %s", fb.currentPath))
-	
+
 	// Clean list without borders or extra styling
 	listView := fb.list.View()
-	
+
 	// Simple help text
 	helpText := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#808080")).
 		MarginTop(1).
 		Render("Enter: select/navigate • h: toggle hidden • /: filter • Esc: back")
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, header, listView, helpText)
 }
-
 
 // GetCurrentPath returns the current directory path
 func (fb FileBrowser) GetCurrentPath() string {
@@ -334,14 +333,14 @@ func (fb FileBrowser) GetSelectedItem() *FileItem {
 // refreshItems scans the current directory and updates the items list
 func (fb *FileBrowser) refreshItems() {
 	fb.items = []list.Item{}
-	
+
 	// Add "select current directory" option at the top
 	fb.items = append(fb.items, FileItem{
 		name:  "📍 Select this directory",
 		path:  fb.currentPath,
 		isDir: true,
 	})
-	
+
 	// Add parent directory option if not at root
 	if fb.currentPath != "/" && fb.currentPath != filepath.Dir(fb.currentPath) {
 		fb.items = append(fb.items, FileItem{
@@ -350,42 +349,42 @@ func (fb *FileBrowser) refreshItems() {
 			isDir: true,
 		})
 	}
-	
+
 	// Read directory contents
 	entries, err := os.ReadDir(fb.currentPath)
 	if err != nil {
 		return
 	}
-	
+
 	// Separate directories and files
 	var dirs, files []FileItem
-	
+
 	for _, entry := range entries {
 		name := entry.Name()
 		isHidden := strings.HasPrefix(name, ".")
-		
+
 		// Skip hidden files if not showing them
 		if isHidden && !fb.showHidden {
 			continue
 		}
-		
+
 		fullPath := filepath.Join(fb.currentPath, name)
 		isDir := entry.IsDir()
-		
+
 		item := FileItem{
 			name:     name,
 			path:     fullPath,
 			isDir:    isDir,
 			isHidden: isHidden,
 		}
-		
+
 		if isDir {
 			dirs = append(dirs, item)
 		} else if !fb.directoryOnly {
 			files = append(files, item)
 		}
 	}
-	
+
 	// Sort directories and files separately
 	sort.Slice(dirs, func(i, j int) bool {
 		return strings.ToLower(dirs[i].name) < strings.ToLower(dirs[j].name)
@@ -393,7 +392,7 @@ func (fb *FileBrowser) refreshItems() {
 	sort.Slice(files, func(i, j int) bool {
 		return strings.ToLower(files[i].name) < strings.ToLower(files[j].name)
 	})
-	
+
 	// Add directories first, then files
 	for _, dir := range dirs {
 		fb.items = append(fb.items, dir)

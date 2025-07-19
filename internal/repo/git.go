@@ -37,10 +37,10 @@ func (g *Git) Clone(url, destination string) GitOperation {
 			Error:   fmt.Errorf("failed to create directory: %w", err),
 		}
 	}
-	
+
 	cmd := exec.Command("git", "clone", url, destination)
 	output, err := g.runCommand(cmd)
-	
+
 	return GitOperation{
 		Success: err == nil,
 		Output:  output,
@@ -52,25 +52,25 @@ func (g *Git) Clone(url, destination string) GitOperation {
 func (g *Git) Pull(repoPath string) GitOperation {
 	defer debug.LogFunction("Git.Pull")()
 	debug.Log("Pulling repository at: %s", repoPath)
-	
+
 	cmd := exec.Command("git", "-C", repoPath, "pull")
 	debug.Log("Executing command: %s", cmd.String())
-	
+
 	output, err := g.runCommand(cmd)
-	
+
 	result := GitOperation{
 		Success: err == nil,
 		Output:  output,
 		Error:   err,
 	}
-	
+
 	if err != nil {
 		debug.LogError(err, fmt.Sprintf("git pull failed for %s", repoPath))
 	} else {
 		debug.Log("Git pull successful for %s", repoPath)
 	}
 	debug.Log("Git pull output: %s", output)
-	
+
 	return result
 }
 
@@ -78,7 +78,7 @@ func (g *Git) Pull(repoPath string) GitOperation {
 func (g *Git) Status(repoPath string) GitOperation {
 	cmd := exec.Command("git", "-C", repoPath, "status", "--porcelain")
 	output, err := g.runCommand(cmd)
-	
+
 	return GitOperation{
 		Success: err == nil,
 		Output:  output,
@@ -114,7 +114,7 @@ func (g *Git) runCommand(cmd *exec.Cmd) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	err := cmd.Run()
 	output := stdout.String()
 	if err != nil {
@@ -123,6 +123,6 @@ func (g *Git) runCommand(cmd *exec.Cmd) (string, error) {
 		}
 		return output, fmt.Errorf("%s: %w", strings.TrimSpace(output), err)
 	}
-	
+
 	return output, nil
 }

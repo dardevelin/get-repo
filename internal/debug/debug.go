@@ -20,7 +20,7 @@ func init() {
 		fmt.Printf("Failed to open debug.log: %v\n", err)
 		return
 	}
-	
+
 	debugLogger = log.New(file, "", log.LstdFlags|log.Lmicroseconds)
 	debugLogger.Println("=== DEBUG SESSION STARTED ===")
 }
@@ -30,7 +30,7 @@ func Log(format string, args ...interface{}) {
 	if debugLogger == nil {
 		return
 	}
-	
+
 	// Get caller information
 	_, file, line, ok := runtime.Caller(1)
 	if ok {

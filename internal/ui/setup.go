@@ -77,14 +77,14 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 			s.fileBrowser, cmd = s.fileBrowser.Update(msg)
 			return s, cmd
 		}
-		
+
 	case tea.KeyMsg:
 		// Global back navigation (except for welcome, complete, and browser steps)
-		if msg.String() == "esc" && s.step != StepWelcome && s.step != StepComplete && 
-		   s.step != StepCustomConfigBrowser && s.step != StepCodebasesBrowser {
+		if msg.String() == "esc" && s.step != StepWelcome && s.step != StepComplete &&
+			s.step != StepCustomConfigBrowser && s.step != StepCodebasesBrowser {
 			return s.goBack(), nil
 		}
-		
+
 		switch s.step {
 		case StepWelcome:
 			if msg.String() == "enter" {
@@ -113,7 +113,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 					s.step = StepCodebasesPath
 					s.choices = []string{
 						"Use default location (~/.../dev/vcs-codebases)",
-						"Browse for directory", 
+						"Browse for directory",
 						"Type path manually",
 					}
 					s.selectedIndex = 0
@@ -139,7 +139,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 					s.pathInput.Focus()
 				}
 			}
-			
+
 			if s.browserMode == BrowserModeType && msg.String() == "enter" {
 				path := s.pathInput.Value()
 				if path == "" {
@@ -150,7 +150,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 				s.browserMode = BrowserModeSelect
 				s.choices = []string{
 					"Use default location (~/.../dev/vcs-codebases)",
-					"Browse for directory", 
+					"Browse for directory",
 					"Type path manually",
 				}
 				s.selectedIndex = 0
@@ -166,7 +166,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 						s.step = StepCodebasesPath
 						s.choices = []string{
 							"Use default location (~/.../dev/vcs-codebases)",
-							"Browse for directory", 
+							"Browse for directory",
 							"Type path manually",
 						}
 						s.selectedIndex = 0
@@ -180,7 +180,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 				s.step = StepCodebasesPath
 				s.choices = []string{
 					"Use default location (~/.../dev/vcs-codebases)",
-					"Browse for directory", 
+					"Browse for directory",
 					"Type path manually",
 				}
 				s.selectedIndex = 0
@@ -205,7 +205,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 					// Use default location
 					defaultPath := filepath.Join(os.Getenv("HOME"), "dev", "vcs-codebases")
 					s.codebasesPath = defaultPath
-					
+
 					// Check if we need shell integration
 					if s.useCustomLocation {
 						s.step = StepShellIntegration
@@ -226,14 +226,14 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 					s.pathInput.Focus()
 				}
 			}
-			
+
 			if s.browserMode == BrowserModeType && msg.String() == "enter" {
 				path := s.pathInput.Value()
 				if path == "" {
 					path = filepath.Join(os.Getenv("HOME"), "dev", "vcs-codebases") // Default
 				}
 				s.codebasesPath = os.ExpandEnv(path)
-				
+
 				// Check if we need shell integration
 				if s.useCustomLocation {
 					s.step = StepShellIntegration
@@ -252,7 +252,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 					if selectedItem.name == "📍 Select this directory" {
 						// User selected current directory
 						s.codebasesPath = s.fileBrowser.GetCurrentPath()
-						
+
 						// Check if we need shell integration
 						if s.useCustomLocation {
 							s.step = StepShellIntegration
@@ -268,7 +268,7 @@ func (s SetupWizard) Update(msg tea.Msg) (SetupWizard, tea.Cmd) {
 				}
 			case " ": // Space key also works to select current directory
 				s.codebasesPath = s.fileBrowser.GetCurrentPath()
-				
+
 				// Check if we need shell integration
 				if s.useCustomLocation {
 					s.step = StepShellIntegration
@@ -354,12 +354,12 @@ func (s SetupWizard) goBack() SetupWizard {
 			s.step = StepCodebasesPath
 		}
 	}
-	
+
 	// Reset browser mode when going back
 	if s.step != StepCustomConfigBrowser && s.step != StepCodebasesBrowser {
 		s.browserMode = BrowserModeSelect
 	}
-	
+
 	return s
 }
 
@@ -384,7 +384,7 @@ Press %s to continue.`,
 		// Show the default path
 		defaultPath, _ := os.UserConfigDir()
 		defaultConfigPath := filepath.Join(defaultPath, "get-repo", "config.json")
-		
+
 		choices := ""
 		for i, choice := range s.choices {
 			cursor := "  "
@@ -423,7 +423,7 @@ Enter the directory path for your configuration:
 				s.pathInput.View(),
 				HelpStyle.Render("Enter to confirm • Esc to go back • Tab for completion"))
 		}
-		
+
 		choices := ""
 		for i, choice := range s.choices {
 			cursor := "  "
@@ -473,10 +473,10 @@ Enter the path where you keep your git repositories:
 				s.pathInput.View(),
 				HelpStyle.Render("Enter to confirm • Esc to go back • Tab for completion"))
 		}
-		
+
 		// Show the default path
 		defaultRepoPath := filepath.Join(os.Getenv("HOME"), "dev", "vcs-codebases")
-		
+
 		choices := ""
 		for i, choice := range s.choices {
 			cursor := "  "
@@ -546,7 +546,7 @@ Which shell configuration should we update?
 			defaultPath, _ := os.UserConfigDir()
 			configPath = filepath.Join(defaultPath, "get-repo", "config.json")
 		}
-		
+
 		summary := fmt.Sprintf(`
 %s
 

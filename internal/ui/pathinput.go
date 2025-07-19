@@ -13,11 +13,11 @@ import (
 
 // PathInput provides a text input with path validation and tab completion
 type PathInput struct {
-	textInput     textinput.Model
-	lastPath      string
-	pathExists    bool
-	isDirectory   bool
-	completions   []string
+	textInput         textinput.Model
+	lastPath          string
+	pathExists        bool
+	isDirectory       bool
+	completions       []string
 	showingCompletion bool
 }
 
@@ -27,7 +27,7 @@ func NewPathInput() PathInput {
 	ti.Focus()
 	ti.CharLimit = 256
 	ti.Width = 60
-	
+
 	return PathInput{
 		textInput: ti,
 	}
@@ -36,7 +36,7 @@ func NewPathInput() PathInput {
 // Update handles path input updates including validation and tab completion
 func (p PathInput) Update(msg tea.Msg) (PathInput, tea.Cmd) {
 	var cmd tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -55,17 +55,17 @@ func (p PathInput) Update(msg tea.Msg) (PathInput, tea.Cmd) {
 			p.showingCompletion = false
 		}
 	}
-	
+
 	// Update the text input
 	p.textInput, cmd = p.textInput.Update(msg)
-	
+
 	// Validate path if it changed
 	currentPath := p.textInput.Value()
 	if currentPath != p.lastPath {
 		p.lastPath = currentPath
 		p.validatePath(currentPath)
 	}
-	
+
 	return p, cmd
 }
 
@@ -76,16 +76,16 @@ func (p *PathInput) validatePath(path string) {
 		p.isDirectory = false
 		return
 	}
-	
+
 	// Expand environment variables
 	expandedPath := os.ExpandEnv(path)
-	
+
 	// Check if path exists
 	info, err := os.Stat(expandedPath)
 	if err != nil {
 		p.pathExists = false
 		p.isDirectory = false
-		
+
 		// Check if parent directory exists (for new directories)
 		parent := filepath.Dir(expandedPath)
 		if parentInfo, parentErr := os.Stat(parent); parentErr == nil && parentInfo.IsDir() {
@@ -94,7 +94,7 @@ func (p *PathInput) validatePath(path string) {
 		}
 		return
 	}
-	
+
 	p.pathExists = true
 	p.isDirectory = info.IsDir()
 }
@@ -104,18 +104,18 @@ func (p *PathInput) getTabCompletion(currentPath string) string {
 	if currentPath == "" {
 		return ""
 	}
-	
+
 	expandedPath := os.ExpandEnv(currentPath)
-	
+
 	// If the path ends with a separator, list contents of that directory
 	if strings.HasSuffix(expandedPath, string(filepath.Separator)) {
 		return p.completeDirectory(expandedPath, "")
 	}
-	
+
 	// Otherwise, complete the current path segment
 	dir := filepath.Dir(expandedPath)
 	base := filepath.Base(expandedPath)
-	
+
 	return p.completeDirectory(dir, base)
 }
 
@@ -125,7 +125,7 @@ func (p *PathInput) completeDirectory(dir, prefix string) string {
 	if err != nil {
 		return ""
 	}
-	
+
 	var matches []string
 	for _, entry := range entries {
 		name := entry.Name()
@@ -137,12 +137,12 @@ func (p *PathInput) completeDirectory(dir, prefix string) string {
 			matches = append(matches, fullPath)
 		}
 	}
-	
+
 	if len(matches) > 0 {
 		sort.Strings(matches)
 		return matches[0]
 	}
-	
+
 	return ""
 }
 
@@ -150,7 +150,7 @@ func (p *PathInput) completeDirectory(dir, prefix string) string {
 func (p PathInput) View() string {
 	// Get the current value for styling
 	currentPath := p.textInput.Value()
-	
+
 	// Style the input based on validation state
 	var styledInput string
 	if currentPath == "" {
@@ -174,7 +174,7 @@ func (p PathInput) View() string {
 			Foreground(lipgloss.Color("9")).
 			Render(p.textInput.View())
 	}
-	
+
 	// Add validation indicator
 	var indicator string
 	if currentPath != "" {
@@ -199,17 +199,17 @@ func (p PathInput) View() string {
 			}
 		}
 	}
-	
+
 	result := styledInput
 	if indicator != "" {
 		result += "\n" + indicator
 	}
-	
+
 	// Add tab completion hint
 	if currentPath != "" && !p.showingCompletion {
 		result += "\n" + HelpStyle.Render("Press Tab for completion")
 	}
-	
+
 	return result
 }
 

@@ -40,25 +40,25 @@ const (
 
 // Model represents the main TUI model
 type Model struct {
-	state         State
-	config        config.Config
-	list          list.Model
-	textInput     textinput.Model
-	spinner       spinner.Model
-	progress      progress.Model
-	statusMsg     string
-	err           error
-	selected      map[int]struct{}
-	manager       *repo.Manager
-	git           *repo.Git
-	setupWizard   SetupWizard
-	
+	state       State
+	config      config.Config
+	list        list.Model
+	textInput   textinput.Model
+	spinner     spinner.Model
+	progress    progress.Model
+	statusMsg   string
+	err         error
+	selected    map[int]struct{}
+	manager     *repo.Manager
+	git         *repo.Git
+	setupWizard SetupWizard
+
 	// Batch operation tracking
-	totalOps      int
-	completedOps  int
+	totalOps         int
+	completedOps     int
 	operationResults []OperationResult
 	operationMutex   sync.Mutex
-	
+
 	// Batch removal tracking
 	batchRemoveRepos []string
 }
@@ -112,17 +112,17 @@ func (i Item) Title() string {
 	var statusIcon string
 	var color string
 	var selectionIndicator string
-	
+
 	// Selection indicator - only show for selected items
 	if i.selected {
 		selectionIndicator = "▸ " // Right-pointing triangle
 	} else {
 		selectionIndicator = "  "
 	}
-	
+
 	// Indentation based on tree level
 	indent := strings.Repeat("  ", i.level)
-	
+
 	// Expand/collapse indicator
 	if i.isExpandable {
 		if i.isExpanded {
@@ -133,13 +133,13 @@ func (i Item) Title() string {
 	} else {
 		expandIcon = "  "
 	}
-	
+
 	// Status indicator - get from node if available
 	if i.node != nil {
 		i.status = i.node.Status
 		i.statusMsg = i.node.StatusMsg
 	}
-	
+
 	switch i.status {
 	case StatusPending:
 		statusIcon = "••• " // Three dots for pending
@@ -150,12 +150,12 @@ func (i Item) Title() string {
 	default:
 		statusIcon = ""
 	}
-	
+
 	// Icon and color based on type and status
 	if i.isGitRepo {
 		typeIcon = ""
 		color = "#4ec9b0" // Git repo color
-		
+
 		// Override color based on status
 		switch i.status {
 		case StatusSuccess:
@@ -172,18 +172,18 @@ func (i Item) Title() string {
 		typeIcon = ""
 		color = "#569cd6" // Directory color
 	}
-	
+
 	// Apply selection styling if selected
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
 	if i.selected {
 		style = style.Bold(true).Background(lipgloss.Color("#264f78")) // Highlight background
 	}
-	
+
 	// Build the title with status
 	title := fmt.Sprintf("%s%s%s%s%s %s", selectionIndicator, indent, expandIcon, statusIcon, typeIcon, i.name)
-	
+
 	// Don't show error message inline - it's shown at the bottom
-	
+
 	return style.Render(title)
 }
 
@@ -194,18 +194,18 @@ func (i Item) FilterValue() string { return i.name }
 func InitialModel(initialState State) Model {
 	defer debug.LogFunction("InitialModel")()
 	debug.Log("Creating initial model with state: %v", initialState)
-	
+
 	cfg, err := config.Load()
 	if err != nil {
 		debug.LogError(err, "loading config in InitialModel")
 		return Model{err: err}
 	}
 	debug.Log("Config loaded: CodebasesPath='%s'", cfg.CodebasesPath)
-	
+
 	// Check if this is a first run
 	isFirstRun := config.IsFirstRun()
 	debug.Log("IsFirstRun: %v, CodebasesPath empty: %v", isFirstRun, cfg.CodebasesPath == "")
-	
+
 	if isFirstRun || cfg.CodebasesPath == "" {
 		debug.Log("Entering setup mode")
 		return Model{
@@ -214,12 +214,12 @@ func InitialModel(initialState State) Model {
 			setupWizard: NewSetupWizard(),
 		}
 	}
-	
+
 	// Initialize managers
 	debug.Log("Initializing managers with CodebasesPath: %s", cfg.CodebasesPath)
 	manager := repo.NewManager(cfg.CodebasesPath)
 	git := repo.NewGit(cfg.CodebasesPath)
-	
+
 	// Scan for repositories
 	debug.Log("Scanning for repositories...")
 	repos, err := manager.List()
@@ -228,29 +228,29 @@ func InitialModel(initialState State) Model {
 		return Model{err: fmt.Errorf("failed to scan repositories: %w", err)}
 	}
 	debug.Log("Found %d repositories", len(repos))
-	
+
 	// Debug: Check if we found repositories
 	if len(repos) == 0 {
 		debug.Log("No repositories found in path: %s", cfg.CodebasesPath)
 		return Model{err: fmt.Errorf("no repositories found in: %s", cfg.CodebasesPath)}
 	}
-	
+
 	// Build tree structure from repositories
 	debug.Log("Building repository tree...")
 	tree := buildRepositoryTree(repos)
 	debug.Log("Built tree with %d root nodes", len(tree))
-	
+
 	// Convert tree to flat list for display
 	debug.Log("Flattening tree for display...")
 	items := flattenTree(tree)
 	debug.Log("Created %d list items", len(items))
-	
+
 	// Create list with proper dimensions
 	delegate := list.NewDefaultDelegate()
 	delegate.ShowDescription = false
 	delegate.SetHeight(1) // Single line items like file browser
 	delegate.SetSpacing(0)
-	
+
 	// Configure delegate styles similar to file browser
 	delegate.Styles.SelectedTitle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#ffffff")).
@@ -259,31 +259,31 @@ func InitialModel(initialState State) Model {
 	delegate.Styles.NormalTitle = lipgloss.NewStyle()
 	delegate.Styles.DimmedTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("#808080"))
 	delegate.Styles.FilterMatch = lipgloss.NewStyle().Foreground(lipgloss.Color("#4ec9b0"))
-	
+
 	l := list.New(items, delegate, 80, 20) // Start with reasonable size like file browser
 	l.Title = "Your Repositories"
 	l.SetShowHelp(false)
-	l.SetShowStatusBar(false) // Hide status bar like file browser
-	l.SetShowTitle(true) // Show title
+	l.SetShowStatusBar(false)    // Hide status bar like file browser
+	l.SetShowTitle(true)         // Show title
 	l.SetFilteringEnabled(false) // Disable filtering initially to avoid conflicts
 	l.DisableQuitKeybindings()
-	
+
 	// Set title styles to ensure visibility
 	l.Styles.Title = TitleStyle
-	
+
 	// Ensure list starts at the top
 	if len(items) > 0 {
 		l.Select(0)
 	}
-	
+
 	// Create spinner
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = ProgressStyle
-	
+
 	// Create progress bar
 	p := progress.New(progress.WithDefaultGradient())
-	
+
 	return Model{
 		state:    initialState,
 		config:   cfg,
@@ -309,13 +309,13 @@ func getListTitle(state State) string {
 
 // Messages
 type cloneFinishedMsg struct{ err error }
-type updateFinishedMsg struct{ 
+type updateFinishedMsg struct {
 	repoName string
-	err      error 
+	err      error
 }
-type removeFinishedMsg struct{ 
+type removeFinishedMsg struct {
 	repoName string
-	err      error 
+	err      error
 }
 type batchOperationMsg struct {
 	repoName string
@@ -333,15 +333,15 @@ func (m Model) cloneRepo(url string) tea.Cmd {
 		if err := repo.ValidateURL(url); err != nil {
 			return cloneFinishedMsg{err: err}
 		}
-		
+
 		clonePath := repo.GetClonePath(url)
 		destination := m.manager.GetFullPath(clonePath)
-		
+
 		result := m.git.Clone(url, destination)
 		if !result.Success {
 			return cloneFinishedMsg{err: result.Error}
 		}
-		
+
 		return cloneFinishedMsg{err: nil}
 	}
 }
@@ -351,11 +351,11 @@ func (m Model) updateRepo(repoName string) tea.Cmd {
 		debug.Log("updateRepo command starting for: %s", repoName)
 		repoPath := m.manager.GetFullPath(repoName)
 		debug.Log("Full repo path: %s", repoPath)
-		
+
 		// Mark as pending immediately
 		debug.Log("Starting git pull...")
 		result := m.git.Pull(repoPath)
-		
+
 		var message string
 		if !result.Success {
 			// Provide more detailed error information
@@ -364,7 +364,7 @@ func (m Model) updateRepo(repoName string) tea.Cmd {
 			} else {
 				message = "Unknown error occurred"
 			}
-			
+
 			// Common git error scenarios
 			if strings.Contains(message, "not a git repository") {
 				message = "Not a git repository"
@@ -379,14 +379,14 @@ func (m Model) updateRepo(repoName string) tea.Cmd {
 			} else if strings.Contains(message, "Authentication failed") {
 				message = "Authentication failed"
 			}
-			
+
 			return batchOperationMsg{
 				repoName: repoName,
 				success:  false,
 				message:  message,
 			}
 		}
-		
+
 		return batchOperationMsg{
 			repoName: repoName,
 			success:  true,
@@ -398,7 +398,7 @@ func (m Model) updateRepo(repoName string) tea.Cmd {
 func (m Model) removeRepo(repoName string) tea.Cmd {
 	return func() tea.Msg {
 		repoPath := m.manager.GetFullPath(repoName)
-		
+
 		if err := os.RemoveAll(repoPath); err != nil {
 			return batchOperationMsg{
 				repoName: repoName,
@@ -406,7 +406,7 @@ func (m Model) removeRepo(repoName string) tea.Cmd {
 				message:  err.Error(),
 			}
 		}
-		
+
 		return batchOperationMsg{
 			repoName: repoName,
 			success:  true,
@@ -423,22 +423,22 @@ func refreshList() tea.Msg {
 func buildRepositoryTree(repos []repo.Repository) []*TreeNode {
 	var rootNodes []*TreeNode
 	nodeMap := make(map[string]*TreeNode)
-	
+
 	// Sort repositories by path for consistent ordering
 	sort.Slice(repos, func(i, j int) bool {
 		return repos[i].Name < repos[j].Name
 	})
-	
+
 	for _, r := range repos {
 		parts := strings.Split(r.Name, string(filepath.Separator))
 		if len(parts) == 0 {
 			continue
 		}
-		
+
 		var currentNodes []*TreeNode = rootNodes
 		var parent *TreeNode = nil
 		currentPath := ""
-		
+
 		// Build the path level by level
 		for level, part := range parts {
 			if currentPath == "" {
@@ -446,7 +446,7 @@ func buildRepositoryTree(repos []repo.Repository) []*TreeNode {
 			} else {
 				currentPath = filepath.Join(currentPath, part)
 			}
-			
+
 			// Check if node already exists
 			var existingNode *TreeNode
 			for _, node := range currentNodes {
@@ -455,7 +455,7 @@ func buildRepositoryTree(repos []repo.Repository) []*TreeNode {
 					break
 				}
 			}
-			
+
 			if existingNode == nil {
 				// Create new node
 				isRepo := (level == len(parts)-1) && r.IsGitDir
@@ -468,13 +468,13 @@ func buildRepositoryTree(repos []repo.Repository) []*TreeNode {
 					Parent:     parent,
 					Children:   []*TreeNode{},
 				}
-				
+
 				if parent == nil {
 					rootNodes = append(rootNodes, node)
 				} else {
 					parent.Children = append(parent.Children, node)
 				}
-				
+
 				nodeMap[currentPath] = node
 				currentNodes = node.Children
 				parent = node
@@ -485,10 +485,10 @@ func buildRepositoryTree(repos []repo.Repository) []*TreeNode {
 			}
 		}
 	}
-	
+
 	// Sort children at each level
 	sortTreeNodes(rootNodes)
-	
+
 	return rootNodes
 }
 
@@ -505,7 +505,7 @@ func sortTreeNodes(nodes []*TreeNode) {
 		}
 		return nodes[i].Name < nodes[j].Name
 	})
-	
+
 	for _, node := range nodes {
 		sortTreeNodes(node.Children)
 	}
@@ -514,11 +514,11 @@ func sortTreeNodes(nodes []*TreeNode) {
 // flattenTree converts tree structure to flat list for display
 func flattenTree(roots []*TreeNode) []list.Item {
 	var items []list.Item
-	
+
 	for _, root := range roots {
 		flattenNode(root, &items)
 	}
-	
+
 	return items
 }
 
@@ -537,7 +537,7 @@ func flattenNode(node *TreeNode, items *[]list.Item) {
 		statusMsg:    node.StatusMsg,
 	}
 	*items = append(*items, item)
-	
+
 	// Add children if expanded
 	if node.IsExpanded {
 		for _, child := range node.Children {

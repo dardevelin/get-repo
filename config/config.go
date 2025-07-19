@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	AppName = "get-repo"
+	AppName        = "get-repo"
 	ConfigFileName = "config.json"
-	EnvConfigPath = "GET_REPO_CONFIG"
+	EnvConfigPath  = "GET_REPO_CONFIG"
 )
 
 // Config holds the application's configuration.
@@ -76,7 +76,7 @@ func (c Config) Save() error {
 	if err != nil {
 		return err
 	}
-	
+
 	if cfgPath == "" {
 		// No config path set, use default
 		cfgPath, err = getDefaultConfigPath()
@@ -124,7 +124,7 @@ func IsFirstRun() bool {
 	if err != nil || cfgPath == "" {
 		return true
 	}
-	
+
 	_, err = os.Stat(cfgPath)
 	return os.IsNotExist(err)
 }

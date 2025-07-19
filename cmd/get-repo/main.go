@@ -149,7 +149,7 @@ complete -c get-repo -n "__fish_seen_subcommand_from remove" -l force -d "Skip c
 func main() {
 	defer debug.LogFunction("main")()
 	debug.Log("Application starting with args: %v", os.Args[1:])
-	
+
 	// Parse command line arguments
 	cmd, err := cli.ParseArgs(os.Args[1:])
 	if err != nil {
@@ -158,9 +158,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Try 'get-repo --help' for more information.")
 		os.Exit(1)
 	}
-	
+
 	debug.Log("Parsed command type: %v", cmd.Type)
-	
+
 	// Handle help and version
 	switch cmd.Type {
 	case cli.CommandHelp:
@@ -176,7 +176,7 @@ func main() {
 		}
 		return
 	}
-	
+
 	// Load configuration
 	debug.Log("Loading configuration...")
 	cfg, err := config.Load()
@@ -186,35 +186,35 @@ func main() {
 		os.Exit(1)
 	}
 	debug.Log("Configuration loaded: CodebasesPath=%s", cfg.CodebasesPath)
-	
+
 	// Check if we need setup
 	if cfg.CodebasesPath == "" && cmd.Type != cli.CommandNone && cmd.Type != cli.CommandInteractive {
 		fmt.Fprintln(os.Stderr, "Error: VCS_CODEBASES path not set.")
 		fmt.Fprintln(os.Stderr, "Please run 'get-repo' interactively to configure.")
 		os.Exit(1)
 	}
-	
+
 	// Handle commands that need interactive TUI
 	if cmd.NeedsInteractiveTUI() {
 		debug.Log("Command needs interactive TUI, launching...")
 		runTUI(getInitialState(cmd))
 		return
 	}
-	
+
 	// Handle non-interactive commands
 	runner := cli.NewRunner(cfg)
-	
+
 	switch cmd.Type {
 	case cli.CommandList:
 		if err := runner.List(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 	case cli.CommandClone:
 		// Handle bulk clone
 		var urls []string
-		
+
 		// Check if we have a file to read from
 		if cmd.CloneFile != "" {
 			fileURLs, err := runner.ParseCloneFile(cmd.CloneFile)
@@ -224,20 +224,20 @@ func main() {
 			}
 			urls = append(urls, fileURLs...)
 		}
-		
+
 		// Add any additional URLs from command line
 		urls = append(urls, cmd.CloneURLs...)
-		
+
 		// If no URLs collected, fall back to single URL for backward compatibility
 		if len(urls) == 0 && cmd.URLToClone != "" {
 			urls = append(urls, cmd.URLToClone)
 		}
-		
+
 		if len(urls) == 0 {
 			fmt.Fprintln(os.Stderr, "Error: No URLs specified")
 			os.Exit(1)
 		}
-		
+
 		// Clone single or multiple repositories
 		if len(urls) == 1 {
 			if err := runner.Clone(urls[0]); err != nil {
@@ -250,20 +250,20 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		
+
 	case cli.CommandUpdate:
 		if err := runner.Update(cmd.Args); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 	case cli.CommandRemove:
 		force := cmd.Flags["force"]
 		if err := runner.Remove(cmd.Args, force); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command type: %v\n", cmd.Type)
 		os.Exit(1)
@@ -284,7 +284,7 @@ func getInitialState(cmd *cli.Command) ui.State {
 func runTUI(initialState ui.State) {
 	defer debug.LogFunction("runTUI")()
 	debug.Log("Starting TUI with initial state: %v", initialState)
-	
+
 	// Set up logging for debugging
 	if os.Getenv("DEBUG") != "" {
 		debug.Log("DEBUG environment variable set, enabling tea logging")
@@ -296,12 +296,12 @@ func runTUI(initialState ui.State) {
 		}
 		defer f.Close()
 	}
-	
+
 	// Create and run the program
 	debug.Log("Creating UI model...")
 	model := ui.InitialModel(initialState)
 	debug.Log("UI model created successfully")
-	
+
 	debug.Log("Creating tea program...")
 	p := tea.NewProgram(
 		model,
@@ -309,7 +309,7 @@ func runTUI(initialState ui.State) {
 		tea.WithMouseCellMotion(),
 	)
 	debug.Log("Tea program created, starting...")
-	
+
 	if _, err := p.Run(); err != nil {
 		debug.LogError(err, "running tea program")
 		fmt.Fprintf(os.Stderr, "Error running program: %v\n", err)
@@ -323,7 +323,7 @@ func handleCompletion(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("completion command requires shell argument (bash, zsh, or fish)")
 	}
-	
+
 	shell := args[0]
 	switch shell {
 	case "bash":
@@ -335,6 +335,6 @@ func handleCompletion(args []string) error {
 	default:
 		return fmt.Errorf("unsupported shell: %s (supported: bash, zsh, fish)", shell)
 	}
-	
+
 	return nil
 }

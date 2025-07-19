@@ -39,22 +39,22 @@ func ParseArgs(args []string) (*Command, error) {
 		Flags:     make(map[string]bool),
 		CloneURLs: []string{},
 	}
-	
+
 	if len(args) == 0 {
 		// No arguments - default to interactive mode
 		return cmd, nil
 	}
-	
+
 	// Process flags and collect remaining args
 	var remainingArgs []string
 	skipNext := false
-	
+
 	for i, arg := range args {
 		if skipNext {
 			skipNext = false
 			continue
 		}
-		
+
 		switch arg {
 		case "-i", "--interactive":
 			cmd.Type = CommandInteractive
@@ -78,15 +78,15 @@ func ParseArgs(args []string) (*Command, error) {
 			remainingArgs = append(remainingArgs, arg)
 		}
 	}
-	
+
 	if len(remainingArgs) == 0 {
 		// No arguments after flags - default to interactive mode
 		return cmd, nil
 	}
-	
+
 	// Check first remaining argument
 	firstArg := remainingArgs[0]
-	
+
 	// Check if it's a URL (implicit clone)
 	if isGitURL(firstArg) {
 		cmd.Type = CommandClone
@@ -103,7 +103,7 @@ func ParseArgs(args []string) (*Command, error) {
 		}
 		return cmd, nil
 	}
-	
+
 	// Parse commands
 	switch firstArg {
 	case "list":
@@ -139,7 +139,7 @@ func ParseArgs(args []string) (*Command, error) {
 	default:
 		return nil, fmt.Errorf("unknown command: %s", firstArg)
 	}
-	
+
 	return cmd, nil
 }
 
@@ -149,17 +149,17 @@ func isGitURL(s string) bool {
 	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
 		return true
 	}
-	
+
 	// SSH URLs
 	if strings.HasPrefix(s, "git@") {
 		return true
 	}
-	
+
 	// SCP-style URLs (e.g., user@host:path)
 	if strings.Contains(s, "@") && strings.Contains(s, ":") {
 		return true
 	}
-	
+
 	return false
 }
 
