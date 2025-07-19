@@ -1,4 +1,4 @@
-.PHONY: build run clean test lint deps build-all man view-man
+.PHONY: build run clean test lint deps build-all man view-man setup
 
 # Build variables
 BINARY_NAME=get-repo
@@ -58,3 +58,7 @@ man:
 # View man page
 view-man: man
 	man ./docs/get-repo.1
+
+# Setup development environment
+setup:
+	@./scripts/setup-dev.sh

@@ -36,6 +36,14 @@ cd get-repo
 make build
 ```
 
+### Development
+
+For development, you'll also need:
+- `go-md2man` for man page generation: `brew install go-md2man`
+- `golangci-lint` for linting (optional): `brew install golangci-lint`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup instructions.
+
 ## Quick Start
 
 ```bash

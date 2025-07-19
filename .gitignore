@@ -17,8 +17,11 @@
 *.log
 debug.log
 
-# Scripts directory (moved to separate repo)
-scripts/
+# Signing scripts (moved to separate repo)
+scripts/sign-*.sh
+scripts/cleanup-certificates.sh
+scripts/create-csr.sh
+scripts/build-release.sh
 
 # Notarization artifacts
 notarization.json
