@@ -7,11 +7,13 @@ import (
 
 // Command represents a parsed command
 type Command struct {
-	Type      CommandType
-	Args      []string
-	Flags     map[string]bool
-	IsURL     bool
+	Type       CommandType
+	Args       []string
+	Flags      map[string]bool
+	IsURL      bool
 	URLToClone string
+	CloneURLs  []string // For bulk clone
+	CloneFile  string   // File path for bulk clone from file
 }
 
 // CommandType represents the type of command
@@ -32,9 +34,10 @@ const (
 // ParseArgs parses command line arguments
 func ParseArgs(args []string) (*Command, error) {
 	cmd := &Command{
-		Type:  CommandNone,
-		Args:  []string{},
-		Flags: make(map[string]bool),
+		Type:      CommandNone,
+		Args:      []string{},
+		Flags:     make(map[string]bool),
+		CloneURLs: []string{},
 	}
 	
 	if len(args) == 0 {
@@ -42,35 +45,62 @@ func ParseArgs(args []string) (*Command, error) {
 		return cmd, nil
 	}
 	
-	// Check for flags
+	// Process flags and collect remaining args
+	var remainingArgs []string
+	skipNext := false
+	
 	for i, arg := range args {
-		if arg == "-i" || arg == "--interactive" {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		
+		switch arg {
+		case "-i", "--interactive":
 			cmd.Type = CommandInteractive
 			return cmd, nil
-		}
-		if arg == "-h" || arg == "--help" {
+		case "-h", "--help":
 			cmd.Type = CommandHelp
 			return cmd, nil
-		}
-		if arg == "-v" || arg == "--version" {
+		case "-v", "--version":
 			cmd.Type = CommandVersion
 			return cmd, nil
-		}
-		if arg == "--force" {
+		case "--force":
 			cmd.Flags["force"] = true
-			// Remove from args
-			args = append(args[:i], args[i+1:]...)
+		case "-f", "--file":
+			if i+1 < len(args) {
+				cmd.CloneFile = args[i+1]
+				skipNext = true
+			} else {
+				return nil, fmt.Errorf("--file requires a file path")
+			}
+		default:
+			remainingArgs = append(remainingArgs, arg)
 		}
 	}
 	
-	// Check first argument
-	firstArg := args[0]
+	if len(remainingArgs) == 0 {
+		// No arguments after flags - default to interactive mode
+		return cmd, nil
+	}
+	
+	// Check first remaining argument
+	firstArg := remainingArgs[0]
 	
 	// Check if it's a URL (implicit clone)
 	if isGitURL(firstArg) {
 		cmd.Type = CommandClone
 		cmd.IsURL = true
-		cmd.URLToClone = firstArg
+		// Collect all URLs for bulk clone
+		for _, arg := range remainingArgs {
+			if isGitURL(arg) {
+				cmd.CloneURLs = append(cmd.CloneURLs, arg)
+			}
+		}
+		// Keep single URL for backward compatibility
+		if len(cmd.CloneURLs) > 0 {
+			cmd.URLToClone = cmd.CloneURLs[0]
+		}
 		return cmd, nil
 	}
 	
@@ -80,18 +110,31 @@ func ParseArgs(args []string) (*Command, error) {
 		cmd.Type = CommandList
 	case "update":
 		cmd.Type = CommandUpdate
-		if len(args) > 1 {
-			cmd.Args = args[1:]
+		if len(remainingArgs) > 1 {
+			cmd.Args = remainingArgs[1:]
 		}
 	case "remove":
 		cmd.Type = CommandRemove
-		if len(args) > 1 {
-			cmd.Args = args[1:]
+		if len(remainingArgs) > 1 {
+			cmd.Args = remainingArgs[1:]
+		}
+	case "clone":
+		cmd.Type = CommandClone
+		// Collect all URLs after 'clone' command
+		if len(remainingArgs) > 1 {
+			for _, arg := range remainingArgs[1:] {
+				if isGitURL(arg) {
+					cmd.CloneURLs = append(cmd.CloneURLs, arg)
+				}
+			}
+			if len(cmd.CloneURLs) > 0 {
+				cmd.URLToClone = cmd.CloneURLs[0]
+			}
 		}
 	case "completion":
 		cmd.Type = CommandCompletion
-		if len(args) > 1 {
-			cmd.Args = args[1:]
+		if len(remainingArgs) > 1 {
+			cmd.Args = remainingArgs[1:]
 		}
 	default:
 		return nil, fmt.Errorf("unknown command: %s", firstArg)
@@ -140,6 +183,9 @@ func GetHelpText() string {
 Usage:
   get-repo                        Launch interactive TUI
   get-repo <url>                  Clone a repository
+  get-repo <url1> <url2> ...      Clone multiple repositories
+  get-repo -f <file>              Clone repositories from file
+  get-repo clone <url1> <url2>    Clone multiple repositories
   get-repo list                   List all repositories
   get-repo update                 Launch TUI in update mode
   get-repo update <repo>          Update specific repository
@@ -151,6 +197,7 @@ Options:
   -i, --interactive    Force interactive TUI mode
   -h, --help          Show this help message
   -v, --version       Show version information
+  -f, --file <path>   Read repository URLs from file
   --force             Skip confirmation prompts
 
 Completion:
@@ -160,9 +207,18 @@ Completion:
 
 Examples:
   get-repo https://github.com/user/repo
+  get-repo https://github.com/user/repo1 https://github.com/user/repo2
+  get-repo -f repos.txt
+  get-repo -f repos.txt https://github.com/user/extra-repo
   get-repo list
   get-repo update my-project
   get-repo remove old-project --force
+  
+  # File format for -f option (repos.txt):
+  # Comments start with #
+  # One URL per line
+  https://github.com/user/repo1
+  https://github.com/user/repo2
   
   # Install bash completion
   get-repo completion bash > ~/.bash_completion.d/get-repo

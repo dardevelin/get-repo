@@ -22,7 +22,7 @@ _get_repo_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Basic commands and options
-    opts="list update remove completion --help --version --interactive --force"
+    opts="list update remove clone completion --help --version --interactive --force --file"
     
     case "${prev}" in
         update|remove)
@@ -35,6 +35,11 @@ _get_repo_completion() {
             ;;
         completion)
             COMPREPLY=($(compgen -W "bash zsh fish" -- ${cur}))
+            return 0
+            ;;
+        --file|-f)
+            # File completion
+            COMPREPLY=($(compgen -f -- ${cur}))
             return 0
             ;;
         get-repo)
@@ -112,12 +117,14 @@ complete -c get-repo -f
 complete -c get-repo -s h -l help -d "Show help message"
 complete -c get-repo -s v -l version -d "Show version information"
 complete -c get-repo -s i -l interactive -d "Force interactive TUI mode"
+complete -c get-repo -s f -l file -r -d "Read repository URLs from file"
 complete -c get-repo -l force -d "Skip confirmation prompts"
 
 # Subcommands
 complete -c get-repo -n "__fish_use_subcommand" -a "list" -d "List all repositories"
 complete -c get-repo -n "__fish_use_subcommand" -a "update" -d "Update repositories"
 complete -c get-repo -n "__fish_use_subcommand" -a "remove" -d "Remove repositories"
+complete -c get-repo -n "__fish_use_subcommand" -a "clone" -d "Clone repositories"
 complete -c get-repo -n "__fish_use_subcommand" -a "completion" -d "Generate shell completion scripts"
 
 # Repository completion for update and remove
@@ -195,9 +202,43 @@ func main() {
 		}
 		
 	case cli.CommandClone:
-		if err := runner.Clone(cmd.URLToClone); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		// Handle bulk clone
+		var urls []string
+		
+		// Check if we have a file to read from
+		if cmd.CloneFile != "" {
+			fileURLs, err := runner.ParseCloneFile(cmd.CloneFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+				os.Exit(1)
+			}
+			urls = append(urls, fileURLs...)
+		}
+		
+		// Add any additional URLs from command line
+		urls = append(urls, cmd.CloneURLs...)
+		
+		// If no URLs collected, fall back to single URL for backward compatibility
+		if len(urls) == 0 && cmd.URLToClone != "" {
+			urls = append(urls, cmd.URLToClone)
+		}
+		
+		if len(urls) == 0 {
+			fmt.Fprintln(os.Stderr, "Error: No URLs specified")
 			os.Exit(1)
+		}
+		
+		// Clone single or multiple repositories
+		if len(urls) == 1 {
+			if err := runner.Clone(urls[0]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			if err := runner.CloneMultiple(urls); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 		}
 		
 	case cli.CommandUpdate:

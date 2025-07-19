@@ -219,3 +219,146 @@ type updateResult struct {
 	output   string
 	err      error
 }
+
+type cloneResult struct {
+	url      string
+	repoPath string
+	success  bool
+	output   string
+	err      error
+}
+
+// CloneMultiple clones multiple repositories in parallel
+func (r *Runner) CloneMultiple(urls []string) error {
+	if len(urls) == 0 {
+		return fmt.Errorf("no URLs specified")
+	}
+	
+	// Remove duplicates
+	uniqueURLs := make(map[string]bool)
+	var urlList []string
+	for _, url := range urls {
+		if !uniqueURLs[url] {
+			uniqueURLs[url] = true
+			urlList = append(urlList, url)
+		}
+	}
+	
+	if len(urlList) == 1 {
+		return r.Clone(urlList[0])
+	}
+	
+	var wg sync.WaitGroup
+	results := make(chan cloneResult, len(urlList))
+	
+	fmt.Printf("Cloning %d repositories...\n\n", len(urlList))
+	
+	for _, url := range urlList {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			
+			// Validate URL
+			if err := repo.ValidateURL(url); err != nil {
+				results <- cloneResult{
+					url:     url,
+					success: false,
+					err:     fmt.Errorf("invalid URL: %w", err),
+				}
+				return
+			}
+			
+			// Get destination path
+			clonePath := repo.GetClonePath(url)
+			destination := r.manager.GetFullPath(clonePath)
+			
+			// Check if already exists
+			if r.manager.PathExists(clonePath) {
+				results <- cloneResult{
+					url:      url,
+					repoPath: clonePath,
+					success:  false,
+					err:      fmt.Errorf("repository already exists"),
+				}
+				return
+			}
+			
+			// Perform clone
+			result := r.git.Clone(url, destination)
+			results <- cloneResult{
+				url:      url,
+				repoPath: clonePath,
+				success:  result.Success,
+				output:   result.Output,
+				err:      result.Error,
+			}
+		}(url)
+	}
+	
+	// Wait for all clones to complete
+	wg.Wait()
+	close(results)
+	
+	// Print results
+	successCount := 0
+	failCount := 0
+	
+	fmt.Println("Clone Results:")
+	fmt.Println(strings.Repeat("-", 50))
+	
+	for result := range results {
+		if result.success {
+			successCount++
+			fmt.Printf("✓ %s: Cloned to %s\n", result.url, result.repoPath)
+		} else {
+			failCount++
+			fmt.Printf("✗ %s: Failed - %v\n", result.url, result.err)
+		}
+	}
+	
+	fmt.Println(strings.Repeat("-", 50))
+	fmt.Printf("Summary: %d succeeded, %d failed\n", successCount, failCount)
+	
+	if failCount > 0 {
+		return fmt.Errorf("%d clones failed", failCount)
+	}
+	
+	return nil
+}
+
+// ParseCloneFile reads URLs from a file, skipping comments and empty lines
+func (r *Runner) ParseCloneFile(filepath string) ([]string, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+	
+	var urls []string
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+		
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		// Validate URL
+		if err := repo.ValidateURL(line); err != nil {
+			fmt.Printf("Warning: skipping invalid URL on line %d: %s\n", lineNum, line)
+			continue
+		}
+		
+		urls = append(urls, line)
+	}
+	
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file: %w", err)
+	}
+	
+	return urls, nil
+}
