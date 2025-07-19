@@ -1,4 +1,4 @@
-.PHONY: build run clean test lint
+.PHONY: build run clean test lint deps build-all man view-man
 
 # Build variables
 BINARY_NAME=get-repo
@@ -43,3 +43,18 @@ build-all:
 	GOOS=darwin GOARCH=arm64 go build ${LDFLAGS} -o ${BUILD_DIR}/${BINARY_NAME}-darwin-arm64 cmd/get-repo/main.go
 	GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o ${BUILD_DIR}/${BINARY_NAME}-linux-amd64 cmd/get-repo/main.go
 	GOOS=linux GOARCH=arm64 go build ${LDFLAGS} -o ${BUILD_DIR}/${BINARY_NAME}-linux-arm64 cmd/get-repo/main.go
+
+# Generate man page
+man:
+	@echo "Generating man page..."
+	@if command -v go-md2man >/dev/null 2>&1; then \
+		go-md2man -in docs/get-repo.1.md -out docs/get-repo.1; \
+		echo "Man page generated at docs/get-repo.1"; \
+	else \
+		echo "go-md2man not found. Install with: go install github.com/cpuguy83/go-md2man/v2@latest"; \
+		exit 1; \
+	fi
+
+# View man page
+view-man: man
+	man ./docs/get-repo.1

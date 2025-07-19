@@ -55,3 +55,6 @@ Thumbs.db
 
 # Build artifacts
 vendor/
+
+# Generated files
+docs/*.1

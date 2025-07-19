@@ -73,6 +73,7 @@ _get_repo() {
         '(-h --help)'{-h,--help}'[Show help message]' \
         '(-v --version)'{-v,--version}'[Show version information]' \
         '(-i --interactive)'{-i,--interactive}'[Force interactive TUI mode]' \
+        '(-f --file)'{-f,--file}'[Read repository URLs from file]:file:_files' \
         '--force[Skip confirmation prompts]' \
         '*::command:_get_repo_command'
 }
@@ -84,6 +85,7 @@ _get_repo_command() {
         'list:List all repositories'
         'update:Update repositories'
         'remove:Remove repositories'
+        'clone:Clone repositories'
         'completion:Generate shell completion scripts'
     )
     
@@ -92,7 +94,7 @@ _get_repo_command() {
         _alternative \
             'commands:commands:_describe "command" commands' \
             'urls:git urls:_urls'
-    elif (( CURRENT == 2 )); then
+    elif (( CURRENT >= 2 )); then
         case "$words[1]" in
             update|remove)
                 # Get repository list
@@ -101,8 +103,16 @@ _get_repo_command() {
                     _describe 'repositories' repos
                 fi
                 ;;
+            clone)
+                # Multiple URLs can be provided
+                _urls
+                ;;
             completion)
                 _describe 'shells' '(bash zsh fish)'
+                ;;
+            http*|git@*)
+                # If first arg was a URL, continue accepting more URLs
+                _urls
                 ;;
         esac
     fi
