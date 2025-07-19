@@ -4,7 +4,7 @@ import "fmt"
 
 // Version information
 var (
-	Version   = "1.0.1"
+	Version   = "1.0.2"
 	GitCommit = "unknown"
 	BuildDate = "unknown"
 	Author    = "Darcy Brás da Silva"
