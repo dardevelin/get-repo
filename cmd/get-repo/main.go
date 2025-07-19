@@ -91,9 +91,8 @@ _get_repo_command() {
     
     if (( CURRENT == 1 )); then
         # First argument: command or URL
-        _alternative \
-            'commands:command:_describe -t commands "command" commands' \
-            'urls:url:_urls'
+        _describe -t commands 'command' commands
+        _urls
     elif (( CURRENT >= 2 )); then
         case "$words[1]" in
             update|remove)
