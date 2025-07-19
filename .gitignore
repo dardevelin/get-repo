@@ -60,4 +60,4 @@ Thumbs.db
 vendor/
 
 # Generated files
-docs/*.1
+# docs/*.1  # We now include the man page in the repository

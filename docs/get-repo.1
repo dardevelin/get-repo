@@ -1,0 +1,168 @@
+.nh
+.TH GET-REPO(1) get-repo 1.0.0
+Darcy Brás da Silva
+July 2025
+
+.SH NAME
+get-repo \- manage git repositories from one place
+
+
+.SH SYNOPSIS
+\fBget-repo\fP [\fIOPTIONS\fP]
+
+.PP
+\fBget-repo\fP \fIURL\fP [\fIURL\fP\&...]
+
+.PP
+\fBget-repo\fP \fB-f\fP \fIFILE\fP [\fIURL\fP\&...]
+
+.PP
+\fBget-repo\fP \fICOMMAND\fP [\fIARGS\fP]
+
+
+.SH DESCRIPTION
+\fBget-repo\fP helps you organize and manage your local git repositories. Browse them in a tree view, update multiple repos at once, and clone new ones - all from a beautiful terminal interface.
+
+
+.SH OPTIONS
+.TP
+\fB-h\fP, \fB--help\fP
+Show help message and exit
+
+.TP
+\fB-v\fP, \fB--version\fP
+Show version information and exit
+
+.TP
+\fB-i\fP, \fB--interactive\fP
+Force interactive TUI mode
+
+.TP
+\fB-f\fP, \fB--file\fP \fIFILE\fP
+Read repository URLs from file (one per line)
+
+.TP
+\fB--force\fP
+Skip confirmation prompts
+
+
+.SH COMMANDS
+.TP
+\fBlist\fP
+List all repositories
+
+.TP
+\fBupdate\fP [\fIREPO\fP\&...]
+Update repositories. Without arguments, launches interactive mode
+
+.TP
+\fBremove\fP [\fIREPO\fP\&...] [\fB--force\fP]
+Remove repositories. Without arguments, launches interactive mode
+
+.TP
+\fBclone\fP \fIURL\fP [\fIURL\fP\&...]
+Clone one or more repositories
+
+.TP
+\fBcompletion\fP \fISHELL\fP
+Generate shell completion script (bash, zsh, or fish)
+
+
+.SH EXAMPLES
+Launch interactive mode:
+
+.EX
+get-repo
+.EE
+
+.PP
+Clone a single repository:
+
+.EX
+get-repo https://github.com/user/repo
+.EE
+
+.PP
+Clone multiple repositories:
+
+.EX
+get-repo https://github.com/user/repo1 https://github.com/user/repo2
+.EE
+
+.PP
+Clone from file:
+
+.EX
+get-repo -f repos.txt
+.EE
+
+.PP
+Update specific repository:
+
+.EX
+get-repo update github.com/user/repo
+.EE
+
+
+.SH FILE FORMAT
+When using \fB-f\fP, the file should contain one URL per line. Comments starting with # and empty lines are ignored:
+
+.EX
+# My repositories
+https://github.com/user/repo1
+https://github.com/user/repo2
+
+# Work projects
+git@github.com:company/backend.git
+.EE
+
+
+.SH INTERACTIVE MODE
+\fBNavigation:\fP
+- \fB↑/↓\fP - Move up/down
+- \fB←/→\fP - Collapse/expand folders
+- \fB/\fP - Filter repositories
+
+.PP
+\fBActions:\fP
+- \fBSpace\fP - Select/deselect
+- \fBa\fP - Select all
+- \fBn\fP - Deselect all
+- \fBc\fP - Clone new repository
+- \fBu\fP - Update selected
+- \fBr\fP - Remove selected
+- \fBq\fP - Quit
+
+
+.SH FILES
+.TP
+\fB~/.config/get-repo/config.json\fP
+Configuration file
+
+.TP
+\fB~/dev/vcs-codebases/\fP
+Default repository directory
+
+
+.SH ENVIRONMENT
+.TP
+\fBGET_REPO_CONFIG\fP
+Override configuration file location
+
+
+.SH EXIT STATUS
+.TP
+\fB0\fP
+Success
+
+.TP
+\fB1\fP
+General error
+
+
+.SH SEE ALSO
+\fBgit\fP(1)
+
+
+.SH BUGS
+Report bugs at https://github.com/dardevelin/get-repo/issues
