@@ -92,15 +92,15 @@ _get_repo_command() {
     if (( CURRENT == 1 )); then
         # First argument: command or URL
         _alternative \
-            'commands:commands:_describe "command" commands' \
-            'urls:git urls:_urls'
+            'commands:command:_describe -t commands "command" commands' \
+            'urls:url:_urls'
     elif (( CURRENT >= 2 )); then
         case "$words[1]" in
             update|remove)
                 # Get repository list
                 if (( $+commands[get-repo] )); then
                     repos=(${(f)"$(get-repo list 2>/dev/null)"})
-                    _describe 'repositories' repos
+                    _describe -t repositories 'repository' repos
                 fi
                 ;;
             clone)
@@ -108,7 +108,8 @@ _get_repo_command() {
                 _urls
                 ;;
             completion)
-                _describe 'shells' '(bash zsh fish)'
+                local shells=(bash zsh fish)
+                _describe -t shells 'shell' shells
                 ;;
             http*|git@*)
                 # If first arg was a URL, continue accepting more URLs
