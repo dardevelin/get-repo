@@ -1,0 +1,54 @@
+# get-repo Todo List
+
+## High Priority
+
+[ ] Add XDG Base Directory support for Linux
+    - Store repositories in ~/.local/share/get-repo/
+    - Store config in ~/.config/get-repo/
+    - Maintain backward compatibility with current paths
+    - Update documentation for Linux paths
+
+[ ] Implement git output streaming
+    - Show real-time git command output during clone/pull operations
+    - Add progress indicators for network operations
+    - Improve user feedback for long-running operations
+    - Consider using git's progress flags (--progress)
+
+## Medium Priority
+
+[ ] Create Debian package structure
+    - Set up debian/ directory with control files
+    - Create proper .deb package build process
+    - Add systemd service file (if needed)
+    - Test on Ubuntu/Debian systems
+
+[ ] Create RPM package structure
+    - Create .spec file for RPM builds
+    - Test on Fedora/RHEL/openSUSE
+    - Handle different RPM-based distributions
+
+[ ] Update Makefile with packaging targets
+    - Add 'make deb' target for Debian packages
+    - Add 'make rpm' target for RPM packages
+    - Add 'make aur' target for Arch Linux PKGBUILD
+    - Ensure all targets work in containers/CI
+
+## Completed Tasks
+
+[x] Implement bulk clone CLI parsing for multiple URLs
+[x] Add file-based bulk clone with comment support
+[x] Implement parallel clone execution in Runner
+[x] Update README with bulk clone documentation
+[x] Build and test the package
+[x] Create v1.0.0 release with signing and notarization
+[x] Update Homebrew formula to v1.0.0
+[x] Fix Homebrew formula bottle and version info issues
+
+## Future Considerations
+
+[ ] Add Arch Linux AUR package (PKGBUILD)
+[ ] Add Snap package support
+[ ] Add Flatpak support
+[ ] Consider Windows package manager support (Chocolatey/Scoop)
+[ ] Add shell completion for bulk clone operations
+[ ] Add configuration file support for default behaviors
