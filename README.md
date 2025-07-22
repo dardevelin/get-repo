@@ -21,7 +21,7 @@
 - **Short Notation**: Fuzzy matching for providers - `gh:user/repo`, `gl:user/repo`, `bit:user/repo`
 - **Smart Interface**: Works as both an interactive TUI and traditional CLI tool
 - **Fast**: Parallel operations for cloning and updating
-- **Shell Completion**: Tab completion for bash, zsh, and fish
+- **Shell Completion**: Smart tab completion for bash, zsh, and fish with fuzzy matching hints
 
 ## Installation
 
