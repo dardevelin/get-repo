@@ -239,22 +239,37 @@ func main() {
 		}
 
 		// Clone single or multiple repositories
+		var clonedPath string
 		if len(urls) == 1 {
-			if err := runner.Clone(urls[0]); err != nil {
+			path, err := runner.Clone(urls[0])
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
+			clonedPath = path
 		} else {
 			if err := runner.CloneMultiple(urls); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
+			// For multiple clones, don't change directory
+		}
+
+		// If --cd flag is set and we cloned a single repo, output the path
+		if cmd.Flags["cd"] && clonedPath != "" {
+			fmt.Println(clonedPath)
 		}
 
 	case cli.CommandUpdate:
-		if err := runner.Update(cmd.Args); err != nil {
+		path, err := runner.Update(cmd.Args)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
+		}
+		
+		// If --cd flag is set and we updated a single repo, output the path
+		if cmd.Flags["cd"] && path != "" {
+			fmt.Println(path)
 		}
 
 	case cli.CommandRemove:

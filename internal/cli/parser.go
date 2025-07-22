@@ -67,6 +67,8 @@ func ParseArgs(args []string) (*Command, error) {
 			return cmd, nil
 		case "--force":
 			cmd.Flags["force"] = true
+		case "--cd":
+			cmd.Flags["cd"] = true
 		case "-f", "--file":
 			if i+1 < len(args) {
 				cmd.CloneFile = args[i+1]
@@ -145,6 +147,19 @@ func ParseArgs(args []string) (*Command, error) {
 
 // isGitURL checks if a string looks like a git URL
 func isGitURL(s string) bool {
+	// Check for short notation (anything with : that's not a protocol)
+	if strings.Contains(s, ":") && !strings.Contains(s, "://") && !strings.HasPrefix(s, "git@") {
+		// Ensure it's not a Windows path (C:\...)
+		if len(s) > 2 && s[1] == ':' && s[2] == '\\' {
+			return false
+		}
+		// Check if it has the pattern prefix:path
+		colonIndex := strings.Index(s, ":")
+		if colonIndex > 0 && colonIndex < len(s)-1 {
+			return true
+		}
+	}
+
 	// HTTP(S) URLs
 	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
 		return true
@@ -193,12 +208,31 @@ Usage:
   get-repo remove <repo> [--force] Remove specific repository
   get-repo completion <shell>     Generate shell completion scripts
 
+URL Format:
+  Full URLs:
+    https://github.com/user/repo
+    git@github.com:user/repo.git
+  
+  Short notation (fuzzy matching):
+    gh:user/repo              → https://github.com/user/repo
+    gl:user/repo              → https://gitlab.com/user/repo
+    bb:user/repo              → https://bitbucket.org/user/repo
+    
+    github:user/repo          → https://github.com/user/repo
+    gitlab:user/repo          → https://gitlab.com/user/repo
+    bitbucket:user/repo       → https://bitbucket.org/user/repo
+    
+    git:user/repo             → https://github.com/user/repo
+    gitl:user/repo            → https://gitlab.com/user/repo
+    bit:user/repo             → https://bitbucket.org/user/repo
+
 Options:
   -i, --interactive    Force interactive TUI mode
   -h, --help          Show this help message
   -v, --version       Show version information
   -f, --file <path>   Read repository URLs from file
   --force             Skip confirmation prompts
+  --cd                Output repository path after clone/update (use with: cd $(get-repo <url> --cd))
 
 Completion:
   get-repo completion bash        Generate bash completion
@@ -206,19 +240,25 @@ Completion:
   get-repo completion fish        Generate fish completion
 
 Examples:
-  get-repo https://github.com/user/repo
-  get-repo https://github.com/user/repo1 https://github.com/user/repo2
+  get-repo gh:dardevelin/get-repo
+  get-repo gh:user/repo1 gitlab:user/repo2
+  cd $(get-repo gh:golang/go --cd)
   get-repo -f repos.txt
-  get-repo -f repos.txt https://github.com/user/extra-repo
   get-repo list
-  get-repo update my-project
+  cd $(get-repo update my-project --cd)
   get-repo remove old-project --force
+  
+  # Short notation examples:
+  get-repo gh:golang/go
+  get-repo gitlab:gitlab-org/gitlab
+  get-repo bitbucket:atlassian/localstack
   
   # File format for -f option (repos.txt):
   # Comments start with #
-  # One URL per line
-  https://github.com/user/repo1
-  https://github.com/user/repo2
+  # One URL per line (supports short notation)
+  gh:user/repo1
+  gitlab:user/repo2
+  https://github.com/user/repo3
   
   # Install bash completion
   get-repo completion bash > ~/.bash_completion.d/get-repo

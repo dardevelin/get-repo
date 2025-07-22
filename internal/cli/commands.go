@@ -46,59 +46,63 @@ func (r *Runner) List() error {
 }
 
 // Clone clones a repository
-func (r *Runner) Clone(url string) error {
+func (r *Runner) Clone(url string) (string, error) {
+	// Expand short notation
+	expandedURL := repo.ExpandShortNotation(url)
+	
 	// Validate URL
-	if err := repo.ValidateURL(url); err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
+	if err := repo.ValidateURL(expandedURL); err != nil {
+		return "", fmt.Errorf("invalid URL: %w", err)
 	}
 
 	// Get destination path
-	clonePath := repo.GetClonePath(url)
+	clonePath := repo.GetClonePath(expandedURL)
 	destination := r.manager.GetFullPath(clonePath)
 
 	// Check if already exists
 	if r.manager.PathExists(clonePath) {
-		return fmt.Errorf("repository already exists at %s", clonePath)
+		return "", fmt.Errorf("repository already exists at %s", clonePath)
 	}
 
-	fmt.Printf("Cloning %s into %s...\n", url, clonePath)
+	fmt.Printf("Cloning %s into %s...\n", expandedURL, clonePath)
 
 	// Perform clone
-	result := r.git.Clone(url, destination)
+	result := r.git.Clone(expandedURL, destination)
 	if !result.Success {
-		return fmt.Errorf("clone failed: %w", result.Error)
+		return "", fmt.Errorf("clone failed: %w", result.Error)
 	}
 
 	fmt.Println("Clone completed successfully.")
-	return nil
+	return destination, nil
 }
 
 // Update updates one or more repositories
-func (r *Runner) Update(repoNames []string) error {
+func (r *Runner) Update(repoNames []string) (string, error) {
 	if len(repoNames) == 0 {
-		return fmt.Errorf("no repositories specified")
+		return "", fmt.Errorf("no repositories specified")
 	}
 
 	if len(repoNames) == 1 {
 		return r.updateSingle(repoNames[0])
 	}
 
-	return r.updateMultiple(repoNames)
+	err := r.updateMultiple(repoNames)
+	return "", err
 }
 
 // updateSingle updates a single repository
-func (r *Runner) updateSingle(repoName string) error {
+func (r *Runner) updateSingle(repoName string) (string, error) {
 	repoPath := r.manager.GetFullPath(repoName)
 
 	if !repo.IsGitRepository(repoPath) {
-		return fmt.Errorf("%s is not a git repository", repoName)
+		return "", fmt.Errorf("%s is not a git repository", repoName)
 	}
 
 	fmt.Printf("Updating %s...\n", repoName)
 
 	result := r.git.Pull(repoPath)
 	if !result.Success {
-		return fmt.Errorf("update failed: %w", result.Error)
+		return "", fmt.Errorf("update failed: %w", result.Error)
 	}
 
 	fmt.Println("Update completed successfully.")
@@ -106,7 +110,7 @@ func (r *Runner) updateSingle(repoName string) error {
 		fmt.Println(strings.TrimSpace(result.Output))
 	}
 
-	return nil
+	return repoPath, nil
 }
 
 // updateMultiple updates multiple repositories in parallel
@@ -245,7 +249,8 @@ func (r *Runner) CloneMultiple(urls []string) error {
 	}
 
 	if len(urlList) == 1 {
-		return r.Clone(urlList[0])
+		_, err := r.Clone(urlList[0])
+		return err
 	}
 
 	var wg sync.WaitGroup
@@ -258,8 +263,11 @@ func (r *Runner) CloneMultiple(urls []string) error {
 		go func(url string) {
 			defer wg.Done()
 
+			// Expand short notation
+			expandedURL := repo.ExpandShortNotation(url)
+
 			// Validate URL
-			if err := repo.ValidateURL(url); err != nil {
+			if err := repo.ValidateURL(expandedURL); err != nil {
 				results <- cloneResult{
 					url:     url,
 					success: false,
@@ -269,7 +277,7 @@ func (r *Runner) CloneMultiple(urls []string) error {
 			}
 
 			// Get destination path
-			clonePath := repo.GetClonePath(url)
+			clonePath := repo.GetClonePath(expandedURL)
 			destination := r.manager.GetFullPath(clonePath)
 
 			// Check if already exists
@@ -284,10 +292,10 @@ func (r *Runner) CloneMultiple(urls []string) error {
 			}
 
 			// Perform clone
-			result := r.git.Clone(url, destination)
+			result := r.git.Clone(expandedURL, destination)
 			results <- cloneResult{
 				url:      url,
-				repoPath: clonePath,
+				repoPath: destination,
 				success:  result.Success,
 				output:   result.Output,
 				err:      result.Error,

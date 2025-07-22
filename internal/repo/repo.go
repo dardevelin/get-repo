@@ -133,20 +133,81 @@ func (m *Manager) List() ([]Repository, error) {
 	return repos, err
 }
 
+// ExpandShortNotation expands short notation like gh:user/repo to full URLs
+func ExpandShortNotation(input string) string {
+	// Check if input contains colon for short notation
+	colonIndex := strings.Index(input, ":")
+	if colonIndex == -1 || colonIndex == 0 {
+		return input
+	}
+
+	// Extract prefix and path
+	prefix := strings.ToLower(input[:colonIndex])
+	path := input[colonIndex+1:]
+
+	// Define known providers
+	providers := map[string]string{
+		"github":    "github.com",
+		"gitlab":    "gitlab.com",
+		"bitbucket": "bitbucket.org",
+	}
+
+	// Try exact match first
+	for name, domain := range providers {
+		if prefix == name {
+			return fmt.Sprintf("https://%s/%s", domain, path)
+		}
+	}
+
+	// Fuzzy match - find the provider that starts with the prefix
+	var matches []string
+	var matchedDomains []string
+	
+	for name, domain := range providers {
+		if strings.HasPrefix(name, prefix) {
+			matches = append(matches, name)
+			matchedDomains = append(matchedDomains, domain)
+		}
+	}
+
+	// If exactly one match, use it
+	if len(matches) == 1 {
+		return fmt.Sprintf("https://%s/%s", matchedDomains[0], path)
+	}
+
+	// If no matches or multiple matches, try common abbreviations
+	commonAbbreviations := map[string]string{
+		"gh": "github.com",
+		"gl": "gitlab.com",
+		"bb": "bitbucket.org",
+		"git": "github.com", // Default "git" to GitHub as it's most common
+	}
+
+	if domain, ok := commonAbbreviations[prefix]; ok {
+		return fmt.Sprintf("https://%s/%s", domain, path)
+	}
+
+	// Return input unchanged if no clear match
+	return input
+}
+
 // ValidateURL validates and normalizes a git repository URL
 func ValidateURL(rawURL string) error {
 	if rawURL == "" {
 		return fmt.Errorf("empty URL provided")
 	}
 
+	// Expand short notation first
+	expandedURL := ExpandShortNotation(rawURL)
+
 	// Handle SSH URLs
-	if strings.HasPrefix(rawURL, "git@") {
+	if strings.HasPrefix(expandedURL, "git@") {
 		return nil
 	}
 
 	// Handle HTTP(S) URLs
-	if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
-		_, err := url.Parse(rawURL)
+	if strings.HasPrefix(expandedURL, "http://") || strings.HasPrefix(expandedURL, "https://") {
+		_, err := url.Parse(expandedURL)
 		if err != nil {
 			return fmt.Errorf("invalid URL: %w", err)
 		}
@@ -154,16 +215,17 @@ func ValidateURL(rawURL string) error {
 	}
 
 	// Handle SCP-style URLs
-	if strings.Contains(rawURL, ":") && !strings.Contains(rawURL, "://") {
+	if strings.Contains(expandedURL, ":") && !strings.Contains(expandedURL, "://") {
 		return nil
 	}
 
-	return fmt.Errorf("unsupported URL format: %s", rawURL)
+	return fmt.Errorf("unsupported URL format: %s", expandedURL)
 }
 
 // GetClonePath derives the local filesystem path from a git URL
 func GetClonePath(gitURL string) string {
-	path := gitURL
+	// Expand short notation first
+	path := ExpandShortNotation(gitURL)
 
 	// Remove protocol prefixes
 	path = strings.TrimPrefix(path, "https://")

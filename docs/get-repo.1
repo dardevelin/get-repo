@@ -1,5 +1,5 @@
 .nh
-.TH GET-REPO(1) get-repo 1.0.0
+.TH GET-REPO(1) get-repo 1.0.3
 Darcy Brás da Silva
 July 2025
 
@@ -45,6 +45,10 @@ Read repository URLs from file (one per line)
 \fB--force\fP
 Skip confirmation prompts
 
+.TP
+\fB--cd\fP
+Output repository path after clone/update (for use with command substitution)
+
 
 .SH COMMANDS
 .TP
@@ -68,6 +72,28 @@ Clone one or more repositories
 Generate shell completion script (bash, zsh, or fish)
 
 
+.SH URL FORMAT
+\fBget-repo\fP supports both full URLs and short notation for popular git hosting services:
+
+.PP
+\fBFull URLs:\fP
+- \fBhttps://github.com/user/repo\fR
+- \fBgit@github.com:user/repo.git\fR
+- \fBhttps://gitlab.com/user/repo\fR
+
+.PP
+\fBShort notation (with fuzzy matching):\fP
+- \fBgh:user/repo\fR → \fBhttps://github.com/user/repo\fR
+- \fBgl:user/repo\fR → \fBhttps://gitlab.com/user/repo\fR
+- \fBbb:user/repo\fR → \fBhttps://bitbucket.org/user/repo\fR
+- \fBgithub:user/repo\fR → \fBhttps://github.com/user/repo\fR
+- \fBgitlab:user/repo\fR → \fBhttps://gitlab.com/user/repo\fR
+- \fBbitbucket:user/repo\fR → \fBhttps://bitbucket.org/user/repo\fR
+- \fBgit:user/repo\fR → \fBhttps://github.com/user/repo\fR (defaults to GitHub)
+- \fBgitl:user/repo\fR → \fBhttps://gitlab.com/user/repo\fR
+- \fBbit:user/repo\fR → \fBhttps://bitbucket.org/user/repo\fR
+
+
 .SH EXAMPLES
 Launch interactive mode:
 
@@ -76,17 +102,24 @@ get-repo
 .EE
 
 .PP
-Clone a single repository:
+Clone using short notation:
 
 .EX
-get-repo https://github.com/user/repo
+get-repo gh:dardevelin/get-repo
 .EE
 
 .PP
-Clone multiple repositories:
+Clone multiple repositories with mixed notation:
 
 .EX
-get-repo https://github.com/user/repo1 https://github.com/user/repo2
+get-repo gh:user/repo1 gitlab:user/repo2 https://github.com/user/repo3
+.EE
+
+.PP
+Clone and change to directory:
+
+.EX
+cd $(get-repo gh:golang/go --cd)
 .EE
 
 .PP
@@ -97,23 +130,25 @@ get-repo -f repos.txt
 .EE
 
 .PP
-Update specific repository:
+Update and change to directory:
 
 .EX
-get-repo update github.com/user/repo
+cd $(get-repo update github.com/user/repo --cd)
 .EE
 
 
 .SH FILE FORMAT
-When using \fB-f\fP, the file should contain one URL per line. Comments starting with # and empty lines are ignored:
+When using \fB-f\fP, the file should contain one URL per line. Both full URLs and short notation are supported. Comments starting with # and empty lines are ignored:
 
 .EX
 # My repositories
-https://github.com/user/repo1
-https://github.com/user/repo2
+gh:user/repo1
+gitlab:user/repo2
+https://github.com/user/repo3
 
 # Work projects
 git@github.com:company/backend.git
+bitbucket:team/frontend
 .EE
 
 

@@ -18,6 +18,7 @@
 - **Tree View**: See all your repos organized by provider (github.com, gitlab.com, etc.)
 - **Bulk Operations**: Update or remove multiple repositories at once
 - **Bulk Clone**: Clone multiple repos from command line or a file
+- **Short Notation**: Fuzzy matching for providers - `gh:user/repo`, `gl:user/repo`, `bit:user/repo`
 - **Smart Interface**: Works as both an interactive TUI and traditional CLI tool
 - **Fast**: Parallel operations for cloning and updating
 - **Shell Completion**: Tab completion for bash, zsh, and fish
@@ -50,11 +51,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup instructions.
 # Launch the interactive UI
 get-repo
 
-# Clone a repository
+# Clone a repository (with short notation)
+get-repo gh:user/repo
 get-repo https://github.com/user/repo
 
+# Clone and change to directory
+cd $(get-repo gh:golang/go --cd)
+
 # Clone multiple repositories
-get-repo https://github.com/user/repo1 https://github.com/user/repo2
+get-repo gh:user/repo1 gitlab:org/repo2 https://github.com/user/repo3
 
 # Clone from a file
 get-repo -f repos.txt
@@ -65,18 +70,21 @@ get-repo list
 # Update repositories
 get-repo update                      # Interactive selection
 get-repo update github.com/user/repo  # Specific repo
+cd $(get-repo update github.com/user/repo --cd)  # Update and cd
 ```
 
 ### Bulk Clone from File
 
-Create a file with repository URLs:
+Create a file with repository URLs (supports short notation):
 ```
 # repos.txt
-https://github.com/charmbracelet/bubbletea
+gh:charmbracelet/bubbletea
+gitlab:org/project
 https://github.com/charmbracelet/bubbles
 
 # Comments and empty lines are ignored
 git@github.com:company/backend.git
+bitbucket:team/frontend
 ```
 
 Then clone them all:

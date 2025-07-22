@@ -1,4 +1,4 @@
-% GET-REPO(1) get-repo 1.0.0
+% GET-REPO(1) get-repo 1.0.3
 % Darcy Brás da Silva
 % July 2025
 
@@ -37,6 +37,9 @@ get-repo - manage git repositories from one place
 **--force**
 : Skip confirmation prompts
 
+**--cd**
+: Output repository path after clone/update (for use with command substitution)
+
 # COMMANDS
 
 **list**
@@ -54,6 +57,26 @@ get-repo - manage git repositories from one place
 **completion** *SHELL*
 : Generate shell completion script (bash, zsh, or fish)
 
+# URL FORMAT
+
+**get-repo** supports both full URLs and short notation for popular git hosting services:
+
+**Full URLs:**
+- `https://github.com/user/repo`
+- `git@github.com:user/repo.git`
+- `https://gitlab.com/user/repo`
+
+**Short notation (with fuzzy matching):**
+- `gh:user/repo` → `https://github.com/user/repo`
+- `gl:user/repo` → `https://gitlab.com/user/repo`
+- `bb:user/repo` → `https://bitbucket.org/user/repo`
+- `github:user/repo` → `https://github.com/user/repo`
+- `gitlab:user/repo` → `https://gitlab.com/user/repo`
+- `bitbucket:user/repo` → `https://bitbucket.org/user/repo`
+- `git:user/repo` → `https://github.com/user/repo` (defaults to GitHub)
+- `gitl:user/repo` → `https://gitlab.com/user/repo`
+- `bit:user/repo` → `https://bitbucket.org/user/repo`
+
 # EXAMPLES
 
 Launch interactive mode:
@@ -61,14 +84,19 @@ Launch interactive mode:
 get-repo
 ```
 
-Clone a single repository:
+Clone using short notation:
 ```
-get-repo https://github.com/user/repo
+get-repo gh:dardevelin/get-repo
 ```
 
-Clone multiple repositories:
+Clone multiple repositories with mixed notation:
 ```
-get-repo https://github.com/user/repo1 https://github.com/user/repo2
+get-repo gh:user/repo1 gitlab:user/repo2 https://github.com/user/repo3
+```
+
+Clone and change to directory:
+```
+cd $(get-repo gh:golang/go --cd)
 ```
 
 Clone from file:
@@ -76,22 +104,24 @@ Clone from file:
 get-repo -f repos.txt
 ```
 
-Update specific repository:
+Update and change to directory:
 ```
-get-repo update github.com/user/repo
+cd $(get-repo update github.com/user/repo --cd)
 ```
 
 # FILE FORMAT
 
-When using **-f**, the file should contain one URL per line. Comments starting with # and empty lines are ignored:
+When using **-f**, the file should contain one URL per line. Both full URLs and short notation are supported. Comments starting with # and empty lines are ignored:
 
 ```
 # My repositories
-https://github.com/user/repo1
-https://github.com/user/repo2
+gh:user/repo1
+gitlab:user/repo2
+https://github.com/user/repo3
 
 # Work projects
 git@github.com:company/backend.git
+bitbucket:team/frontend
 ```
 
 # INTERACTIVE MODE
