@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2025-07-22
+
+### Fixed
+- Added `--cd` flag to shell completions (bash, zsh, fish)
+- Added fuzzy matching pattern hints to all shell completions
+  - Bash: Suggests patterns when typing `g` or `b`
+  - Zsh: Shows patterns in completion menu
+  - Fish: Shows `gh:`, `gl:`, `bb:` with descriptions
+
 ## [1.0.3] - 2025-07-22
 
 ### Added

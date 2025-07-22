@@ -22,7 +22,7 @@ _get_repo_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Basic commands and options
-    opts="list update remove clone completion --help --version --interactive --force --file"
+    opts="list update remove clone completion --help --version --interactive --force --file --cd"
     
     case "${prev}" in
         update|remove)
@@ -52,6 +52,12 @@ _get_repo_completion() {
                 return 0
             fi
             
+            # Add fuzzy matching hints
+            if [[ ${cur} == g* ]] || [[ ${cur} == b* ]]; then
+                local fuzzy_patterns="gh: gl: git: gitl: gitlab: github: bb: bit: bitbucket:"
+                COMPREPLY=($(compgen -W "${fuzzy_patterns}" -- ${cur}))
+            fi
+            
             return 0
             ;;
     esac
@@ -75,6 +81,7 @@ _get_repo() {
         '(-i --interactive)'{-i,--interactive}'[Force interactive TUI mode]' \
         '(-f --file)'{-f,--file}'[Read repository URLs from file]:file:_files' \
         '--force[Skip confirmation prompts]' \
+        '--cd[Output repository path after clone/update]' \
         '*::command:_get_repo_command'
 }
 
@@ -93,6 +100,17 @@ _get_repo_command() {
         # First argument: command or URL
         _describe -t commands 'command' commands
         _urls
+        
+        # Add fuzzy matching patterns
+        local fuzzy_patterns=(
+            'gh:GitHub repository (e.g., gh:user/repo)'
+            'gl:GitLab repository (e.g., gl:user/repo)'
+            'bb:Bitbucket repository (e.g., bb:user/repo)'
+            'github:GitHub repository'
+            'gitlab:GitLab repository'
+            'bitbucket:Bitbucket repository'
+        )
+        _describe -t fuzzy-patterns 'repository shorthand' fuzzy_patterns
     elif (( CURRENT >= 2 )); then
         case "$words[1]" in
             update|remove)
@@ -105,6 +123,13 @@ _get_repo_command() {
             clone)
                 # Multiple URLs can be provided
                 _urls
+                # Add fuzzy matching patterns for clone
+                local fuzzy_patterns=(
+                    'gh:GitHub repository'
+                    'gl:GitLab repository'
+                    'bb:Bitbucket repository'
+                )
+                _describe -t fuzzy-patterns 'repository shorthand' fuzzy_patterns
                 ;;
             completion)
                 local shells=(bash zsh fish)
@@ -129,6 +154,7 @@ complete -c get-repo -s v -l version -d "Show version information"
 complete -c get-repo -s i -l interactive -d "Force interactive TUI mode"
 complete -c get-repo -s f -l file -r -d "Read repository URLs from file"
 complete -c get-repo -l force -d "Skip confirmation prompts"
+complete -c get-repo -l cd -d "Output repository path after clone/update"
 
 # Subcommands
 complete -c get-repo -n "__fish_use_subcommand" -a "list" -d "List all repositories"
@@ -144,7 +170,17 @@ complete -c get-repo -n "__fish_seen_subcommand_from update remove" -a "(get-rep
 complete -c get-repo -n "__fish_seen_subcommand_from completion" -a "bash zsh fish" -d "Shell"
 
 # Force flag for remove command
-complete -c get-repo -n "__fish_seen_subcommand_from remove" -l force -d "Skip confirmation prompts"`
+complete -c get-repo -n "__fish_seen_subcommand_from remove" -l force -d "Skip confirmation prompts"
+
+# Fuzzy matching patterns
+complete -c get-repo -n "__fish_use_subcommand" -a "gh:" -d "GitHub repository (e.g., gh:user/repo)"
+complete -c get-repo -n "__fish_use_subcommand" -a "gl:" -d "GitLab repository (e.g., gl:user/repo)"
+complete -c get-repo -n "__fish_use_subcommand" -a "bb:" -d "Bitbucket repository (e.g., bb:user/repo)"
+
+# Fuzzy patterns for clone command
+complete -c get-repo -n "__fish_seen_subcommand_from clone" -a "gh:" -d "GitHub repository"
+complete -c get-repo -n "__fish_seen_subcommand_from clone" -a "gl:" -d "GitLab repository"
+complete -c get-repo -n "__fish_seen_subcommand_from clone" -a "bb:" -d "Bitbucket repository"`
 
 func main() {
 	defer debug.LogFunction("main")()
